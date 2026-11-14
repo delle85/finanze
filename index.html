@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <title>Finanze personali</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<!-- Solo file di questo sito: nessuno script o connessione verso altri domini.
-     Fase 2 (OneDrive): aggiungere a connect-src https://login.microsoftonline.com https://graph.microsoft.com -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; worker-src 'self'; manifest-src 'self'">
+<!-- Script solo da questo sito. Connessioni solo verso: accesso Microsoft, Microsoft Graph (OneDrive)
+     e i server da cui OneDrive fa scaricare il contenuto dei file (indirizzi temporanei già autorizzati). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://login.microsoftonline.com https://graph.microsoft.com https://*.1drv.com https://*.microsoftpersonalcontent.com; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; worker-src 'self'; manifest-src 'self'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#050608">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -74,6 +74,9 @@
 <script src="js/core.js"></script>
 <script src="js/api.js"></script>
 <script src="js/cassaforte.js"></script>
+<script src="js/unione.js"></script>
+<script src="js/microsoft.js"></script>
+<script src="js/nuvola.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/porta.js"></script>
 </body>

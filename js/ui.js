@@ -33,7 +33,6 @@ async function aggiornaStato() {
   }
   const b = $("badge");
   b.hidden = !S.stato.da_categorizzare; b.textContent = S.stato.da_categorizzare;
-  $("safe-text").textContent = "Dati cifrati su questo dispositivo";
 }
 
 const piuConti = () => S.stato.conti.length > 1;
@@ -572,16 +571,83 @@ async function renderRegole() {
 }
 
 /* ---------- Dati e sicurezza ---------- */
+const dataOra = (s) => (s ? new Date(s).toLocaleString("it-IT") : "—");
+
+/* Riquadro OneDrive della sezione Dati. */
+function cardOneDrive(info) {
+  const n = info.nuvola, ms = info.microsoft;
+  const chi = ms.utente && ms.utente.email ? `<div class="row"><span>Account Microsoft</span><span class="date">${esc(ms.utente.email)}</span></div>` : "";
+  if (!n) {
+    return `<section class="card glass" style="flex-basis:100%">
+      <h2>OneDrive</h2>
+      <div class="note">Salva i dati <b>cifrati</b> su OneDrive per usarli da più dispositivi (telefono, PC) e con chi condivide le spese.
+        Su OneDrive va solo il file cifrato: Microsoft non può leggerlo. La password resta solo vostra.</div>
+      ${chi}
+      <div style="display:flex;flex-wrap:wrap;gap:10px">
+        <button class="btn primary" type="button" id="o-crea">Salva nel mio OneDrive</button>
+        <button class="btn" type="button" id="o-link-apri">Usa un file condiviso con me…</button>
+      </div>
+      <div id="o-link-box" hidden class="field">
+        <label for="o-link">Link di condivisione ricevuto</label>
+        <input class="input" id="o-link" type="url" placeholder="https://1drv.ms/…" autocomplete="off">
+        <div class="note">I dati di questo dispositivo verranno <b>uniti</b> a quelli del file condiviso (senza doppioni) e da quel momento userai la password di quel file.</div>
+        <div><button class="btn" type="button" id="o-link-ok">Collega</button></div>
+      </div>
+      ${ms.collegato ? "" : `<div class="note">Ti verrà chiesto di accedere con il tuo account Microsoft; poi sblocca di nuovo l'app.</div>`}
+    </section>`;
+  }
+  return `<section class="card glass" style="flex-basis:100%">
+    <h2>OneDrive</h2>
+    <div class="note">I dati sono sincronizzati con il file cifrato <b>${esc(n.nome || "")}</b> su OneDrive. Le modifiche partono da sole;
+      quelle fatte su un altro dispositivo arrivano entro un minuto (o quando riapri l'app).</div>
+    ${chi}
+    <div class="row"><span>Stato</span><span class="date" id="o-stato">${esc(document.getElementById("safe-text").textContent)}</span></div>
+    <div class="row"><span>Ultima sincronizzazione</span><span class="date">${esc(dataOra(n.sincronizzato_il))}</span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px">
+      ${ms.collegato ? `<button class="btn primary" type="button" id="o-sync">Sincronizza ora</button>` : `<button class="btn primary" type="button" id="o-accedi">Accedi con Microsoft</button>`}
+      <button class="btn" type="button" id="o-scollega">Scollega questo dispositivo</button>
+    </div>
+    <details><summary class="note" style="cursor:pointer">Come condividere con un'altra persona</summary>
+      <div class="note">Dal sito o dall'app di OneDrive (con l'account di chi ha creato il file): cartella <b>Finanze</b> → <b>Condividi</b> →
+        scrivi l'email dell'altra persona → permesso <b>Può modificare</b> → <b>Invia</b>. Lei riceve un'email: sul suo dispositivo apre questa app,
+        sceglie <b>Apri i dati da OneDrive</b>, accede con il suo account Microsoft e incolla il link dell'email. Le serve anche la password dei dati,
+        che le dai tu a voce (mai per email o messaggio).</div></details>
+  </section>`;
+}
+
+function collegaCardOneDrive() {
+  const P = window.Porta;
+  const esegui = async (btn, fn) => {
+    btn.disabled = true;
+    try { await fn(); } catch (e) { window.avviso("OneDrive", esc(e.message || String(e))); }
+    btn.disabled = false;
+    await aggiornaStato(); render();
+  };
+  if ($("o-crea")) $("o-crea").onclick = (e) => esegui(e.currentTarget, async () => {
+    const r = await P.collegaCrea();
+    if (r && r.creato) toast("Dati salvati su OneDrive (cartella Finanze)");
+  });
+  if ($("o-link-apri")) $("o-link-apri").onclick = () => { $("o-link-box").hidden = false; $("o-link").focus(); };
+  if ($("o-link-ok")) $("o-link-ok").onclick = (e) => esegui(e.currentTarget, () => P.collegaLink($("o-link").value));
+  if ($("o-sync")) $("o-sync").onclick = (e) => esegui(e.currentTarget, () => P.sincronizza());
+  if ($("o-accedi")) $("o-accedi").onclick = () => P.accediMicrosoft();
+  if ($("o-scollega")) $("o-scollega").onclick = (e) => {
+    if (!window.confirm("Scollegare questo dispositivo da OneDrive? I dati restano qui (cifrati) e su OneDrive, ma non si sincronizzano più.")) return;
+    esegui(e.currentTarget, () => P.scollega());
+  };
+}
+
 async function renderDati() {
   const P = window.Porta, info = await P.info();
   const quando = info.salvato_il ? new Date(info.salvato_il).toLocaleString("it-IT") : "—";
   $("main").innerHTML = `
-    <div class="head"><div><div class="sub">Archivio cifrato, backup, password</div><h1>Dati</h1></div></div>
+    <div class="head"><div><div class="sub">Archivio cifrato, OneDrive, backup, password</div><h1>Dati</h1></div></div>
     <div class="cards">
+      ${cardOneDrive(info)}
       <section class="card glass">
-        <h2>Dove sono i dati</h2>
-        <div class="note">I movimenti sono salvati <b>cifrati</b> (AES-256) nella memoria di questo browser, su questo dispositivo.
-          Senza la password nessuno può leggerli. Ogni modifica viene salvata subito.</div>
+        <h2>Su questo dispositivo</h2>
+        <div class="note">Una copia <b>cifrata</b> (AES-256) dei dati sta nella memoria di questo browser: serve per aprire l'app subito e anche senza rete.
+          Senza la password nessuno può leggerla. Ogni modifica viene salvata subito.</div>
         <div class="row"><span>Movimenti</span><span class="date">${S.stato.n_movimenti}</span></div>
         <div class="row"><span>Ultimo salvataggio</span><span class="date">${esc(quando)}</span></div>
         <div class="row"><span>Dimensione archivio</span><span class="date">${(info.byte / 1024).toFixed(0)} KB</span></div>
@@ -604,7 +670,8 @@ async function renderDati() {
         <div class="field"><label for="d-vecchia">Password attuale</label><input class="input" id="d-vecchia" type="password" autocomplete="current-password"></div>
         <div class="field"><label for="d-nuova">Nuova password (almeno 10 caratteri)</label><input class="input" id="d-nuova" type="password" autocomplete="new-password"></div>
         <div class="field"><label for="d-nuova2">Ripeti la nuova password</label><input class="input" id="d-nuova2" type="password" autocomplete="new-password"></div>
-        <div class="note">Se perdi la password <b>i dati sono persi</b>: nessuno può recuperarli. I backup già scaricati restano con la vecchia password.</div>
+        <div class="note">Se perdi la password <b>i dati sono persi</b>: nessuno può recuperarli. I backup già scaricati restano con la vecchia password.
+          Se usi OneDrive, gli altri dispositivi ti chiederanno la nuova password al prossimo aggiornamento.</div>
         <div><button class="btn" type="button" id="d-cambia">Cambia password</button></div>
       </section>
       <section class="card glass" style="border-color:rgba(255,176,138,.35)">
@@ -614,6 +681,7 @@ async function renderDati() {
         <div><button class="btn" type="button" id="d-elimina">Elimina da questo dispositivo</button></div>
       </section>
     </div>`;
+  collegaCardOneDrive();
   $("d-backup").onclick = () => P.scaricaBackup();
   $("main").querySelectorAll("[data-min]").forEach((b) => b.onclick = async () => { await P.impostaBlocco(+b.dataset.min); toast(`Blocco dopo ${b.dataset.min} minuti`); render(); });
   $("d-cambia").onclick = async () => {
@@ -651,3 +719,31 @@ window.avviso = (titolo, html) => {
   $("m-ok").onclick = chiudiModal;
 };
 window.toast = toast;
+
+/* Arrivati dati nuovi da OneDrive: ridisegna (senza interrompere una finestra aperta). */
+window.datiAggiornati = async (msg) => {
+  if (!api) return;
+  await aggiornaStato();
+  if (!$("modal-bg").classList.contains("open")) render();
+  if (msg) toast(msg);
+};
+window.statoSyncCambiato = () => {
+  const s = $("o-stato");
+  if (s) s.textContent = $("safe-text").textContent;
+};
+
+/* Chiede una password in una finestra. -> Promise<string | null> */
+window.chiediPassword = (titolo, testo) => new Promise((ok) => {
+  $("modal").innerHTML = `<h2 id="m-title" style="font-size:22px">${esc(titolo)}</h2><div class="note">${esc(testo)}</div>
+    <form id="m-form" class="field">
+      <input type="text" name="username" value="Finanze personali" autocomplete="username" hidden>
+      <label for="m-pw">Password</label><input class="input" id="m-pw" type="password" autocomplete="current-password">
+      <div class="actions"><button class="btn" type="button" id="m-annulla">Annulla</button><button class="btn primary" type="submit">Ok</button></div>
+    </form>`;
+  $("modal").setAttribute("aria-labelledby", "m-title");
+  $("modal-bg").classList.add("open");
+  $("m-pw").focus();
+  const fine = (v) => { chiudiModal(); ok(v); };
+  $("m-annulla").onclick = () => fine(null);
+  $("m-form").onsubmit = (e) => { e.preventDefault(); fine($("m-pw").value); };
+});

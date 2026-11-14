@@ -1,39 +1,191 @@
-﻿/* Finanze personali – schermata di sblocco, primo avvio, salvataggio cifrato, blocco automatico. */
+﻿/* Finanze personali – schermata di sblocco, primo avvio, salvataggio cifrato, blocco automatico,
+   sincronizzazione con OneDrive.
+
+   Archivio locale (IndexedDB), un solo record:
+     { testo, rev, salvato_il,                       testo = dati cifrati (copia locale per avvio rapido e offline)
+       nuvola: { driveId, itemId, nome, eTag,        posizione del file su OneDrive e versione che conosciamo
+                 base,                               testo cifrato dell'ultima versione sincronizzata (per unire)
+                 sporco,                             true = modifiche locali non ancora su OneDrive
+                 sincronizzato_il } }
+   Su OneDrive va solo il testo cifrato. */
 (function () {
 "use strict";
-const K = window.Cassaforte, A = window.FinApi;
+const K = window.Cassaforte, A = window.FinApi, MS = window.Microsoft, N = window.Nuvola, U = window.Unione;
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const MIN_PASSWORD = 10;
+const K_DOPO = "fin_dopo", K_LINK = "fin_link", K_RIMBALZO = "fin_rimbalzo", K_MSG = "finanze_msg";
 
 let sessione = null;     // {chiave, salt, iterazioni}: la password non viene conservata
 let modello = null;
 let revBase = null;      // revisione dell'archivio quando l'abbiamo letto/scritto
 let coda = Promise.resolve();
 let ultimaAttivita = Date.now();
-let timerBlocco = null;
+let timerBlocco = null, timerSync = null, timerControllo = null;
+let statoSync = { stato: "locale", messaggio: "" };
 
-/* ---------------------------------------------------------------------------
-   Salvataggio: cifra il modello e lo scrive nell'archivio locale (in serie).
-   --------------------------------------------------------------------------- */
-function salva() {
-  const giro = coda.then(async () => {
-    if (!sessione || !modello) return;
-    const attuale = await K.archivioLeggi();
-    if (attuale && revBase !== null && attuale.rev !== revBase) {
-      // un'altra scheda/finestra ha salvato nel frattempo: non sovrascrivere
-      try { sessionStorage.setItem("finanze_msg", "I dati erano stati modificati in un'altra finestra dell'app: questa è stata bloccata per non sovrascriverli e l'ultima modifica fatta qui non è stata salvata. Sblocca per vedere i dati aggiornati."); } catch (e) { /* */ }
-      bloccaSubito();
-      throw new Error("conflitto");
-    }
-    const testo = await K.cifra(sessione, modello);
-    await K.archivioScrivi({ testo, rev: modello.rev, salvato_il: new Date().toISOString() });
-    revBase = modello.rev;
-  });
+const ss = { get: (k) => { try { return sessionStorage.getItem(k); } catch (e) { return null; } },
+  set: (k, v) => { try { v === null ? sessionStorage.removeItem(k) : sessionStorage.setItem(k, v); } catch (e) { /* */ } } };
+
+/* Mette in coda (una cosa alla volta: salvataggi e sincronizzazioni non si sovrappongono). */
+function inCoda(fn) {
+  const giro = coda.then(fn);
   coda = giro.catch(() => {});
   return giro;
 }
 
+/* ---------------------------------------------------------------------------
+   Salvataggio locale
+   --------------------------------------------------------------------------- */
+function salva() {
+  return inCoda(async () => {
+    if (!sessione || !modello) return;
+    const attuale = await K.archivioLeggi();
+    if (attuale && revBase !== null && attuale.rev !== revBase) {
+      // un'altra scheda/finestra ha salvato nel frattempo: non sovrascrivere
+      ss.set(K_MSG, "I dati erano stati modificati in un'altra finestra dell'app: questa è stata bloccata per non sovrascriverli e l'ultima modifica fatta qui non è stata salvata. Sblocca per vedere i dati aggiornati.");
+      bloccaSubito();
+      throw new Error("conflitto");
+    }
+    const testo = await K.cifra(sessione, modello);
+    const rec = { testo, rev: modello.rev, salvato_il: new Date().toISOString() };
+    if (attuale && attuale.nuvola) rec.nuvola = { ...attuale.nuvola, sporco: true };
+    await K.archivioScrivi(rec);
+    revBase = modello.rev;
+    if (rec.nuvola) { mostraStato("attesa"); programmaSync(1500); }
+  });
+}
+
+/* Sostituisce il contenuto del modello in memoria (l'API lo usa per riferimento). */
+function sostituisciModello(nuovo) {
+  for (const k of Object.keys(modello)) delete modello[k];
+  Object.assign(modello, nuovo);
+  if (!modello.impostazioni) modello.impostazioni = {};
+  A.migraModello(modello);
+}
+
+/* ---------------------------------------------------------------------------
+   Sincronizzazione con OneDrive
+   --------------------------------------------------------------------------- */
+const TESTI_STATO = {
+  locale: "Dati cifrati su questo dispositivo",
+  ok: "Sincronizzato con OneDrive",
+  attesa: "Modifiche in attesa di invio a OneDrive",
+  invio: "Sincronizzazione…",
+  offline: "Offline: le modifiche partiranno al ritorno della rete",
+  accesso: "Accedi a Microsoft per sincronizzare",
+  errore: "Sincronizzazione non riuscita",
+};
+function mostraStato(stato, messaggio = "") {
+  statoSync = { stato, messaggio };
+  const t = $("safe-text");
+  if (t) t.textContent = TESTI_STATO[stato] + (messaggio && stato === "errore" ? ": " + messaggio : "");
+  const s = $("safe");
+  if (s) s.classList.toggle("avviso", ["accesso", "errore", "offline"].includes(stato));
+  if (window.statoSyncCambiato) window.statoSyncCambiato(statoSync);
+}
+
+function programmaSync(ms) {
+  clearTimeout(timerSync);
+  timerSync = setTimeout(() => { sincronizza().catch(() => {}); }, ms);
+}
+
+function sincronizza() {
+  return inCoda(async () => {
+    if (!sessione || !modello) return;
+    const rec = await K.archivioLeggi();
+    if (!rec || !rec.nuvola) { mostraStato("locale"); return; }
+    if (!navigator.onLine) { mostraStato(rec.nuvola.sporco ? "offline" : "ok"); return; }
+    if (!MS.collegato()) { mostraStato("accesso"); return; }
+    mostraStato("invio");
+    try {
+      await sincronizzaRecord(rec);
+    } catch (e) {
+      if (e instanceof MS.NonCollegato) mostraStato("accesso");
+      else if (e instanceof N.ErroreRete) mostraStato("offline");
+      else { mostraStato("errore", e.message || String(e)); console.error(e); }
+    }
+  });
+}
+
+async function scriviRec(testo, nuvola) {
+  const rec = { testo, rev: modello.rev, salvato_il: new Date().toISOString(), nuvola };
+  await K.archivioScrivi(rec);
+  revBase = modello.rev;
+  return rec;
+}
+
+async function sincronizzaRecord(rec) {
+  for (let tentativo = 0; tentativo < 4; tentativo++) {
+    const nv = rec.nuvola;
+    const revInizio = modello.rev;
+    const m = await N.meta(nv);
+    if (m.eTag === nv.eTag) {
+      if (!nv.sporco) { mostraStato("ok"); return; }
+      try {
+        const r = await N.carica(nv, rec.testo, nv.eTag);
+        rec = await scriviRec(rec.testo, { ...nv, eTag: r.eTag, base: rec.testo, sporco: false, sincronizzato_il: new Date().toISOString() });
+        mostraStato("ok");
+        return;
+      } catch (e) { if (!(e instanceof N.Conflitto)) throw e; continue; }
+    }
+    // Su OneDrive c'è una versione nuova (dell'altro dispositivo)
+    const { testo: remoto, eTag } = await N.scarica(nv);
+    if (!K.stessaChiave(sessione, remoto)) { passwordCambiataAltrove(rec, remoto, eTag); return; }
+    const loro = await K.decifraCon(sessione, remoto);
+    if (modello.rev !== revInizio) { rec = await K.archivioLeggi(); continue; }   // modificato qui nel frattempo: si riprova
+    if (!nv.sporco) {
+      sostituisciModello(loro);
+      modello.rev = Math.max(loro.rev || 0, revBase || 0) + 1;
+      await scriviRec(await K.cifra(sessione, modello), { ...nv, eTag, base: remoto, sporco: false, sincronizzato_il: new Date().toISOString() });
+      mostraStato("ok");
+      datiAggiornati("Dati aggiornati da OneDrive");
+      return;
+    }
+    // modifiche da entrambe le parti: si uniscono
+    const base = nv.base && K.stessaChiave(sessione, nv.base) ? await K.decifraCon(sessione, nv.base).catch(() => null) : null;
+    sostituisciModello(U.unisci(base, modello, loro, "nostro"));
+    const testo = await K.cifra(sessione, modello);
+    try {
+      const r = await N.carica(nv, testo, eTag);
+      await scriviRec(testo, { ...nv, eTag: r.eTag, base: testo, sporco: false, sincronizzato_il: new Date().toISOString() });
+      mostraStato("ok");
+      datiAggiornati("Le tue modifiche sono state unite a quelle arrivate da OneDrive");
+      return;
+    } catch (e) {
+      if (!(e instanceof N.Conflitto)) throw e;
+      // nel frattempo è cambiato di nuovo: si salva l'unione in locale e si riprova
+      rec = await scriviRec(testo, { ...nv, eTag, base: remoto, sporco: true });
+    }
+  }
+  throw new Error("il file cambia troppo spesso, riprovo più tardi");
+}
+
+function datiAggiornati(msg) {
+  if (window.datiAggiornati) window.datiAggiornati(msg);
+}
+
+/* La password del file è stata cambiata su un altro dispositivo: si prende il file nuovo e si chiede la password. */
+async function passwordCambiataAltrove(rec, remoto, eTag) {
+  const persi = rec.nuvola.sporco;
+  await K.archivioScrivi({ testo: remoto, rev: (rec.rev || 0) + 1, salvato_il: new Date().toISOString(),
+    nuvola: { ...rec.nuvola, eTag, base: remoto, sporco: false } });
+  ss.set(K_MSG, "La password dei dati è stata cambiata su un altro dispositivo: sblocca con la nuova password." +
+    (persi ? " Le ultime modifiche fatte qui e non ancora inviate a OneDrive sono andate perse." : ""));
+  bloccaSubito();
+}
+
+function avviaControlloRemoto() {
+  clearInterval(timerControllo);
+  timerControllo = setInterval(() => { if (!document.hidden) sincronizza().catch(() => {}); }, 60000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && sessione) programmaSync(300); });
+  window.addEventListener("online", () => { if (sessione) programmaSync(300); });
+  window.addEventListener("offline", () => { if (sessione && statoSync.stato !== "locale") mostraStato("offline"); });
+}
+
+/* ---------------------------------------------------------------------------
+   Entrata e blocco
+   --------------------------------------------------------------------------- */
 async function entra(oggetto, sess, rev) {
   sessione = sess; modello = oggetto; revBase = rev;
   if (!modello.impostazioni) modello.impostazioni = {};
@@ -46,6 +198,22 @@ async function entra(oggetto, sess, rev) {
   avviaControlloInattivita();
   await window.avviaInterfaccia(A.creaApi(modello, salva));
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  const rec = await K.archivioLeggi();
+  mostraStato(rec && rec.nuvola ? (MS.collegato() ? "invio" : "accesso") : "locale");
+  avviaControlloRemoto();
+  await riprendiAzione();
+  sincronizza().catch(() => {});
+}
+
+/* Azione chiesta prima di andare alla pagina di accesso Microsoft (es. "crea" il file su OneDrive). */
+async function riprendiAzione() {
+  const dopo = ss.get(K_DOPO);
+  ss.set(K_DOPO, null);
+  if (!dopo || !MS.collegato()) return;
+  try {
+    if (dopo === "crea") await Porta.collegaCrea();
+    else if (dopo === "link") { const l = ss.get(K_LINK); ss.set(K_LINK, null); if (l) await Porta.collegaLink(l); }
+  } catch (e) { window.avviso("OneDrive", esc(e.message || String(e))); }
 }
 
 /* Blocco: toglie tutto dalla memoria ricaricando la pagina. */
@@ -73,18 +241,39 @@ function avviaControlloInattivita() {
 }
 
 /* ---------------------------------------------------------------------------
-   Funzioni usate dalla sezione "Dati"
+   Collegamento a OneDrive (dalla sezione "Dati", con i dati già aperti)
    --------------------------------------------------------------------------- */
-function scaricaFile(nome, testo, tipo) {
-  const url = URL.createObjectURL(new Blob([testo], { type: tipo }));
-  const a = document.createElement("a");
-  a.href = url; a.download = nome; document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 5000);
+/* Apre un file su OneDrive: se la chiave è diversa chiede la password di quel file. -> {oggetto, sessione, testo, eTag} */
+async function apriRemoto(pos, chiediPassword) {
+  const { testo, eTag } = await N.scarica(pos);
+  K.leggiIntestazione(testo);
+  if (sessione && K.stessaChiave(sessione, testo)) return { oggetto: await K.decifraCon(sessione, testo), sessione, testo, eTag };
+  for (;;) {
+    const pw = await chiediPassword();
+    if (pw === null) throw new Error("Collegamento annullato.");
+    try { const r = await K.apri(testo, pw); return { ...r, testo, eTag }; }
+    catch (e) { if (!(e instanceof K.PasswordErrata)) throw e; window.toast("Password errata"); }
+  }
 }
 
-const oggiCompatto = () => { const d = new Date(); return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`; };
+/* Unisce i dati di questo dispositivo con quelli del file su OneDrive e li salva lì (con la password del file). */
+async function collegaEsistente(pos) {
+  const r = await apriRemoto(pos, () => window.chiediPassword("Password del file su OneDrive",
+    "Il file su OneDrive è protetto da un'altra password. Inseriscila: da ora userai quella anche su questo dispositivo."));
+  if (!r.oggetto || r.oggetto.formato !== "finanze-dati") throw new Error("Il file su OneDrive non contiene dati di Finanze personali.");
+  await inCoda(async () => {
+    const prima = modello.movimenti.length;
+    sessione = r.sessione;
+    sostituisciModello(U.unisci(null, modello, r.oggetto, "loro"));
+    const testo = await K.cifra(sessione, modello);
+    const c = await N.carica(pos, testo, r.eTag);
+    await scriviRec(testo, { ...c.posizione, eTag: c.eTag, base: testo, sporco: false, sincronizzato_il: new Date().toISOString() });
+    mostraStato("ok");
+    datiAggiornati(`Collegato a OneDrive: ${modello.movimenti.length} movimenti (${prima} erano su questo dispositivo)`);
+  });
+}
 
-window.Porta = {
+const Porta = window.Porta = {
   blocca,
   async scaricaBackup() {
     await coda;
@@ -96,7 +285,9 @@ window.Porta = {
     const rec = await K.archivioLeggi();
     let persistente = false;
     try { persistente = navigator.storage && navigator.storage.persisted ? await navigator.storage.persisted() : false; } catch (e) { /* */ }
-    return { salvato_il: rec && rec.salvato_il, byte: rec ? rec.testo.length : 0, minuti: minutiBlocco(), persistente };
+    return { salvato_il: rec && rec.salvato_il, byte: rec ? rec.testo.length : 0, minuti: minutiBlocco(), persistente,
+      nuvola: rec && rec.nuvola ? { nome: rec.nuvola.nome, sporco: rec.nuvola.sporco, sincronizzato_il: rec.nuvola.sincronizzato_il } : null,
+      microsoft: { collegato: MS.collegato(), utente: MS.utente() }, stato: statoSync };
   },
   async impostaBlocco(min) {
     modello.impostazioni.blocco_minuti = String(min);
@@ -115,7 +306,70 @@ window.Porta = {
     await K.archivioCancella();
     bloccaSubito();
   },
+  sincronizza: () => sincronizza(),
+  /* Va alla pagina di accesso Microsoft; i dati sono già salvati, al ritorno si sblocca di nuovo. */
+  async accediMicrosoft(dopo = "", link = "") {
+    await coda;
+    ss.set(K_DOPO, dopo || null);
+    ss.set(K_LINK, link || null);
+    return MS.accedi({ dopo });
+  },
+  esciMicrosoft() { MS.esci(); mostraStato("accesso"); },
+  /* Crea il file nel proprio OneDrive con i dati di questo dispositivo. */
+  async collegaCrea() {
+    if (!MS.collegato()) return Porta.accediMicrosoft("crea");
+    const rec = await K.archivioLeggi();
+    try {
+      const r = await N.crea(rec.testo);
+      await inCoda(async () => {
+        const attuale = await K.archivioLeggi();
+        await K.archivioScrivi({ ...attuale, nuvola: { ...r.posizione, eTag: r.eTag, base: rec.testo, sporco: attuale.testo !== rec.testo, sincronizzato_il: new Date().toISOString() } });
+      });
+      mostraStato("ok");
+      sincronizza().catch(() => {});
+      return { creato: true };
+    } catch (e) {
+      if (!e.esiste) throw e;
+      const pos = await N.trovaMio();
+      await collegaEsistente(pos);
+      return { creato: false, unito: true };
+    }
+  },
+  /* Collega al file condiviso da un'altra persona (link ricevuto). */
+  async collegaLink(link) {
+    if (!MS.collegato()) return Porta.accediMicrosoft("link", link);
+    let pos;
+    try { pos = await N.daLink(link); }
+    catch (e) {
+      if (e.negato && !MS.scopeEsteso()) {
+        ss.set(K_DOPO, "link"); ss.set(K_LINK, link);
+        window.avviso("Serve un permesso in più", "Microsoft non permette di aprire il file condiviso con il permesso base. Ti porto alla pagina di accesso per concedere anche l'accesso ai <b>file condivisi con te</b>; poi sblocca di nuovo.");
+        setTimeout(() => MS.accedi({ dopo: "link", esteso: true }), 2500);
+        return { annullato: true };
+      }
+      throw e;
+    }
+    await collegaEsistente(pos);
+    return { unito: true };
+  },
+  async scollega() {
+    await inCoda(async () => {
+      const rec = await K.archivioLeggi();
+      delete rec.nuvola;
+      await K.archivioScrivi(rec);
+    });
+    mostraStato("locale");
+  },
 };
+
+function scaricaFile(nome, testo, tipo) {
+  const url = URL.createObjectURL(new Blob([testo], { type: tipo }));
+  const a = document.createElement("a");
+  a.href = url; a.download = nome; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+const oggiCompatto = () => { const d = new Date(); return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`; };
 
 /* ---------------------------------------------------------------------------
    Schermate della porta d'ingresso
@@ -128,7 +382,7 @@ function mostra(html) {
   document.body.classList.add("chiusa");
   $("porta").hidden = false;
   $("porta-box").innerHTML = html;
-  const primo = $("porta-box").querySelector("input[type=password]");
+  const primo = $("porta-box").querySelector("input[type=password], input[type=url]");
   if (primo) primo.focus();
 }
 
@@ -149,12 +403,23 @@ function scegliFile(accept) {
   });
 }
 
-async function schermataSblocco() {
-  let msg = "";
-  try { msg = sessionStorage.getItem("finanze_msg") || ""; sessionStorage.removeItem("finanze_msg"); } catch (e) { /* */ }
-  mostra(`${msg ? `<div class="box" style="border-color:rgba(255,176,138,.45)"><div class="note" style="color:var(--text)">${esc(msg)}</div></div>` : ""}
-    <div class="brand" style="padding:0"><img src="icone/icona-64.png" alt="" width="40" height="40"> Finanze</div>
+const MARCHIO = `<div class="brand" style="padding:0"><img src="icone/icona-64.png" alt="" width="40" height="40"> Finanze</div>`;
+
+function riquadroMessaggio() {
+  const msg = ss.get(K_MSG) || "";
+  ss.set(K_MSG, null);
+  return msg ? `<div class="box" style="border-color:rgba(255,176,138,.45)"><div class="note" style="color:var(--text)">${esc(msg)}</div></div>` : "";
+}
+
+async function schermataSblocco(rit) {
+  const rec = await K.archivioLeggi();
+  const online = rec && rec.nuvola;
+  const serveMs = online && !MS.collegato();
+  mostra(`${riquadroMessaggio()}${MARCHIO}
     <h2 style="font-size:24px">Sblocca</h2>
+    ${serveMs ? `<div class="box"><b>Non sei collegato a Microsoft</b><div class="note">Puoi sbloccare e usare i dati di questo dispositivo, ma per ricevere e inviare
+      le modifiche su OneDrive devi accedere.${rit && rit.errore && !rit.serveAccesso ? `<br><span style="color:var(--out)">${esc(rit.errore)}</span>` : ""}</div>
+      <button class="btn" type="button" id="p-ms" style="justify-content:center">Accedi con Microsoft</button></div>` : ""}
     <form id="p-form" class="field" autocomplete="on">
       <input type="text" name="username" value="Finanze personali" autocomplete="username" hidden>
       <label for="p-pw">Password</label>
@@ -162,33 +427,37 @@ async function schermataSblocco() {
       <div class="note" id="p-err" hidden style="color:var(--out)"></div>
       <button class="btn primary" id="p-ok" type="submit" style="justify-content:center;margin-top:8px">Sblocca</button>
     </form>
-    <div class="note">I dati sono cifrati su questo dispositivo. Lo sblocco richiede qualche secondo.</div>
+    <div class="note">${online ? `Dati cifrati, sincronizzati con OneDrive${MS.utente() ? ` (${esc(MS.utente().email)})` : ""}.` : "I dati sono cifrati su questo dispositivo."} Lo sblocco richiede qualche secondo.</div>
     <button class="crumb" type="button" id="p-ripristina">Ripristina un backup…</button>`);
   $("p-form").onsubmit = async (ev) => {
     ev.preventDefault();
     errore(""); attesa(true, "Sblocco…");
     try {
-      const rec = await K.archivioLeggi();
-      const { oggetto, sessione: s } = await K.apri(rec.testo, $("p-pw").value);
-      await entra(oggetto, s, rec.rev);
+      const r = await K.archivioLeggi();
+      const { oggetto, sessione: s } = await K.apri(r.testo, $("p-pw").value);
+      await entra(oggetto, s, r.rev);
     } catch (e) {
       errore(e instanceof K.PasswordErrata ? "Password errata." : (e.message || String(e)));
       attesa(false, "Sblocca");
       $("p-pw").select();
     }
   };
+  if ($("p-ms")) $("p-ms").onclick = () => MS.accedi({});
   $("p-ripristina").onclick = () => schermataRipristino(true);
 }
 
-async function schermataBenvenuto() {
-  mostra(`
-    <div class="brand" style="padding:0"><img src="icone/icona-64.png" alt="" width="40" height="40"> Finanze</div>
+async function schermataBenvenuto(rit) {
+  mostra(`${riquadroMessaggio()}${MARCHIO}
     <h2 style="font-size:24px">Benvenuto</h2>
     <div class="note">Su questo dispositivo non ci sono ancora dati. Come vuoi iniziare?</div>
-    <button class="btn primary" type="button" id="p-json" style="justify-content:center">Importa i dati dall'app desktop (.json)</button>
+    ${rit && !rit.ok && rit.errore ? `<div class="note" style="color:var(--out)">${esc(rit.errore)}</div>` : ""}
+    <button class="btn primary" type="button" id="p-online" style="justify-content:center">Apri i dati da OneDrive</button>
+    <button class="btn" type="button" id="p-json" style="justify-content:center">Importa i dati dall'app desktop (.json)</button>
     <button class="btn" type="button" id="p-backup" style="justify-content:center">Ripristina un backup cifrato (.finanze)</button>
     <button class="btn" type="button" id="p-vuoto" style="justify-content:center">Inizia da zero</button>
-    <div class="note">Il file .json si crea sul PC con <span style="font-family:var(--mono)">strumenti\\esporta_per_web.py</span> (vedi LEGGIMI).</div>`);
+    <div class="note">«Apri da OneDrive» va bene sia per il file nel tuo OneDrive sia per quello che qualcuno ha condiviso con te.
+      Il file .json si crea sul PC con <span style="font-family:var(--mono)">strumenti\\esporta_per_web.py</span> (vedi LEGGIMI).</div>`);
+  $("p-online").onclick = () => (MS.collegato() ? schermataApriOnline() : MS.accedi({ dopo: "apri-onedrive" }));
   $("p-json").onclick = async () => {
     const f = await scegliFile(".json,application/json");
     if (!f) return;
@@ -199,6 +468,75 @@ async function schermataBenvenuto() {
   };
   $("p-backup").onclick = () => schermataRipristino(false);
   $("p-vuoto").onclick = () => schermataNuovaPassword(A.modelloVuoto(), "Archivio nuovo, con le regole di base.");
+}
+
+/* Primo avvio su un dispositivo nuovo: cerca il file nel proprio OneDrive, altrimenti chiede il link. */
+async function schermataApriOnline(msgErrore = "") {
+  mostra(`${MARCHIO}<h2 style="font-size:24px">Apri da OneDrive</h2><div class="note">Cerco il file nel tuo OneDrive…</div>`);
+  let pos = null;
+  try { if (!msgErrore) pos = await N.trovaMio(); }
+  catch (e) { if (e instanceof MS.NonCollegato) return MS.accedi({ dopo: "apri-onedrive" }); msgErrore = e.message; }
+  if (pos) return schermataPasswordOnline(pos);
+  const u = MS.utente();
+  mostra(`${MARCHIO}<h2 style="font-size:24px">Apri da OneDrive</h2>
+    <div class="note">${u ? `Collegato come <b>${esc(u.email)}</b>. ` : ""}Nel tuo OneDrive non c'è il file <b>${N.CARTELLA}/${N.NOME_FILE}</b>.
+      Se qualcuno lo ha condiviso con te, incolla qui il link che hai ricevuto (dall'email di OneDrive: «Apri»/«Visualizza», poi copia l'indirizzo).</div>
+    <form id="p-form" class="field" style="gap:10px">
+      <label for="p-link">Link di condivisione</label>
+      <input class="input" id="p-link" type="url" placeholder="https://1drv.ms/…" required autocomplete="off">
+      <div class="note" id="p-err" ${msgErrore ? "" : "hidden"} style="color:var(--out)">${esc(msgErrore)}</div>
+      <div class="actions"><button class="btn" type="button" id="p-indietro">Indietro</button>
+        <button class="btn primary" id="p-ok" type="submit">Apri</button></div>
+    </form>
+    <button class="crumb" type="button" id="p-altro">Usa un altro account Microsoft</button>`);
+  $("p-indietro").onclick = avvio;
+  $("p-altro").onclick = () => { MS.esci(); MS.accedi({ dopo: "apri-onedrive" }); };
+  $("p-form").onsubmit = async (ev) => {
+    ev.preventDefault();
+    errore(""); attesa(true, "Apertura…");
+    const link = $("p-link").value;
+    try {
+      schermataPasswordOnline(await N.daLink(link));
+    } catch (e) {
+      if (e.negato && !MS.scopeEsteso()) { ss.set(K_LINK, link); return MS.accedi({ dopo: "apri-link", esteso: true }); }
+      errore(e.message || String(e)); attesa(false, "Apri");
+    }
+  };
+}
+
+async function schermataPasswordOnline(pos) {
+  mostra(`${MARCHIO}<h2 style="font-size:24px">Apri da OneDrive</h2><div class="note">Scarico il file cifrato…</div>`);
+  let testo, eTag;
+  try { ({ testo, eTag } = await N.scarica(pos)); K.leggiIntestazione(testo); }
+  catch (e) { return schermataApriOnline(e.message || String(e)); }
+  mostra(`${MARCHIO}<h2 style="font-size:24px">Password dei dati</h2>
+    <div class="note">Trovato <b>${esc(pos.nome)}</b> su OneDrive. Inserisci la password con cui è protetto (la stessa usata sugli altri dispositivi).</div>
+    <form id="p-form" class="field" style="gap:10px">
+      <input type="text" name="username" value="Finanze personali" autocomplete="username" hidden>
+      <label for="p-pw">Password</label>
+      <input class="input" id="p-pw" type="password" autocomplete="current-password" required>
+      <div class="note" id="p-err" hidden style="color:var(--out)"></div>
+      <div class="actions"><button class="btn" type="button" id="p-indietro">Indietro</button>
+        <button class="btn primary" id="p-ok" type="submit">Apri</button></div>
+    </form>`);
+  $("p-indietro").onclick = avvio;
+  $("p-form").onsubmit = async (ev) => {
+    ev.preventDefault();
+    errore(""); attesa(true, "Sblocco…");
+    try {
+      const { oggetto, sessione: s } = await K.apri(testo, $("p-pw").value);
+      if (!oggetto || oggetto.formato !== "finanze-dati") throw new Error("Il file non contiene dati di Finanze personali.");
+      if (await K.archivioLeggi()) throw new Error("Esiste già un archivio su questo dispositivo: ricarica la pagina.");
+      const rev = (oggetto.rev || 0) + 1;
+      oggetto.rev = rev;
+      await K.archivioScrivi({ testo: await K.cifra(s, oggetto), rev, salvato_il: new Date().toISOString(),
+        nuvola: { ...pos, eTag, base: testo, sporco: false, sincronizzato_il: new Date().toISOString() } });
+      await entra(oggetto, s, rev);
+    } catch (e) {
+      errore(e instanceof K.PasswordErrata ? "Password errata." : (e.message || String(e)));
+      attesa(false, "Apri");
+    }
+  };
 }
 
 function schermataNuovaPassword(m, intro, fileJson) {
@@ -233,7 +571,7 @@ function schermataNuovaPassword(m, intro, fileJson) {
       await entra(m, s, 1);
       if (fileJson) window.avviso("Dati importati e cifrati",
         `Ora <b>elimina il file ${esc(fileJson)}</b> (e svuota il cestino): contiene i movimenti in chiaro.<br><br>
-         Consiglio: vai in <b>Dati</b> e scarica subito un backup cifrato da tenere su una chiavetta.`);
+         Poi vai in <b>Dati</b>: puoi salvarli su OneDrive (cifrati) e scaricare un backup da tenere su una chiavetta.`);
     } catch (e) { errore(e.message || String(e)); attesa(false, "Cifra e apri"); }
   };
 }
@@ -246,7 +584,8 @@ async function schermataRipristino(sostituisce) {
   mostra(`
     <h2 style="font-size:24px">Ripristina backup</h2>
     <div class="note">File: <b>${esc(f.name)}</b>. Inserisci la password usata quando è stato fatto il backup.</div>
-    ${sostituisce ? `<div class="box" style="border-color:rgba(255,176,138,.45)"><b>Attenzione</b><div class="note">I dati attuali su questo dispositivo verranno <b>sostituiti</b> da quelli del backup.</div></div>` : ""}
+    ${sostituisce ? `<div class="box" style="border-color:rgba(255,176,138,.45)"><b>Attenzione</b><div class="note">I dati attuali su questo dispositivo verranno <b>sostituiti</b> da quelli del backup
+      (e, se il dispositivo è collegato a OneDrive, il backup verrà unito ai dati online alla prossima sincronizzazione).</div></div>` : ""}
     <form id="p-form" class="field" style="gap:10px">
       <input type="text" name="username" value="Finanze personali" autocomplete="username" hidden>
       <label for="p-pw">Password del backup</label>
@@ -262,9 +601,13 @@ async function schermataRipristino(sostituisce) {
     try {
       const { oggetto, sessione: s } = await K.apri(testo, $("p-pw").value);
       if (!oggetto || oggetto.formato !== "finanze-dati") throw new Error("Contenuto del backup non riconosciuto.");
-      const rev = (oggetto.rev || 0) + 1;
+      const prec = await K.archivioLeggi();
+      const rev = Math.max(oggetto.rev || 0, prec ? prec.rev || 0 : 0) + 1;
       oggetto.rev = rev;
-      await K.archivioScrivi({ testo: await K.cifra(s, oggetto), rev, salvato_il: new Date().toISOString() });
+      const rec = { testo: await K.cifra(s, oggetto), rev, salvato_il: new Date().toISOString() };
+      // collegato a OneDrive: il backup diventa una modifica locale (senza base comune) da unire
+      if (prec && prec.nuvola) rec.nuvola = { ...prec.nuvola, base: null, sporco: true };
+      await K.archivioScrivi(rec);
       await entra(oggetto, s, rev);
       window.toast("Backup ripristinato");
     } catch (e) {
@@ -279,10 +622,32 @@ async function avvio() {
     mostra(`<h2>Browser non adatto</h2><div class="note">Serve un browser recente aperto da un indirizzo https (o da localhost).</div>`);
     return;
   }
+  const rit = await MS.gestisciRitorno();
+  if (rit && rit.dopo) ss.set(K_DOPO, rit.dopo);
   let rec = null;
   try { rec = await K.archivioLeggi(); }
   catch (e) { mostra(`<h2>Memoria non disponibile</h2><div class="note">Il browser non consente di salvare dati (navigazione privata?). ${esc(e.message || e)}</div>`); return; }
-  if (rec) schermataSblocco(); else schermataBenvenuto();
+
+  // primo avvio "Apri da OneDrive": si riprende dopo l'accesso Microsoft
+  const dopo = ss.get(K_DOPO);
+  if (!rec && (dopo === "apri-onedrive" || dopo === "apri-link")) {
+    ss.set(K_DOPO, null);
+    if (rit && !rit.ok) return schermataBenvenuto(rit);
+    if (dopo === "apri-link") {
+      const link = ss.get(K_LINK); ss.set(K_LINK, null);
+      try { return schermataPasswordOnline(await N.daLink(link)); }
+      catch (e) { return schermataApriOnline(e.message || String(e)); }
+    }
+    return schermataApriOnline();
+  }
+  if (!rec) return schermataBenvenuto(rit);
+
+  // archivio collegato a OneDrive ma senza accesso in questa scheda: rientro "silenzioso" (una volta per scheda)
+  if (rec.nuvola && !MS.collegato() && navigator.onLine && !rit && !ss.get(K_RIMBALZO)) {
+    ss.set(K_RIMBALZO, "1");
+    if (MS.utente()) return MS.accedi({ silenzioso: true });
+  }
+  schermataSblocco(rit);
 }
 
 if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1")) {

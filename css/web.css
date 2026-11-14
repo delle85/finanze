@@ -9,6 +9,8 @@ body.chiusa .app { display: none; }
 .btn:disabled { opacity: .6; cursor: default; }
 #btn-blocca { display: inline-flex; }
 .safe { word-break: normal; }
+.safe.avviso { color: var(--out); border-color: rgba(255,176,138,.45); }
+details summary { list-style-position: inside; }
 @media (max-width: 600px) {
   /* sul telefono: Blocca resta visibile nella barra in alto */
   #btn-blocca { margin: 0 0 0 auto !important; min-height: 40px; padding: 0 12px; }

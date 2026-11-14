@@ -71,6 +71,13 @@ async function decifraCon(sessione, testo) {
   return JSON.parse(dec.decode(chiaro));
 }
 
+/* true se il file è cifrato con la stessa chiave della sessione (stesso salt e iterazioni):
+   altrimenti la password è stata cambiata altrove e serve di nuovo. */
+function stessaChiave(sessione, testo) {
+  const { h } = leggiIntestazione(testo);
+  return h.salt === b64(sessione.salt) && h.iterazioni === sessione.iterazioni;
+}
+
 /* Apre un file cifrato con la password: restituisce {oggetto, sessione}. */
 async function apri(testo, password) {
   const { h } = leggiIntestazione(testo);
@@ -114,7 +121,7 @@ const archivioCancella = () => op("readwrite", (s) => s.delete(CHIAVE));
 
 G.Cassaforte = {
   ITERAZIONI, PasswordErrata, FileNonValido,
-  nuovaSessione, cifra, apri, decifraCon, leggiIntestazione,
+  nuovaSessione, cifra, apri, decifraCon, leggiIntestazione, stessaChiave,
   archivioLeggi, archivioScrivi, archivioCancella,
 };
 })(globalThis);
