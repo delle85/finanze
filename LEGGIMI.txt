@@ -38,6 +38,13 @@ Uso
     entrate/uscite, contano i singoli acquisti. Le ricariche di carte di cui
     non hai l'estratto stanno in "Prepagata (non dettagliata)" e restano uscite.
     Filtro "Conto" in Movimenti e Riepilogo (predefinito: tutti i conti).
+  - Conti: una scheda per conto (e il totale) con saldo, entrate, uscite e
+    numero di movimenti del periodo scelto, e la data dell'ultimo movimento.
+    I giroconti non sono entrate/uscite ma spostano il saldo. Il saldo e' la
+    somma dei movimenti importati fino alla fine del periodo: l'app non conosce
+    il saldo iniziale, quindi vale "dal" primo movimento di quel conto (per una
+    carta, dal primo estratto importato) e puo' differire da quello della banca.
+    Clic su una scheda: apre Movimenti filtrati su quel conto.
   - Blocca: toglie i dati dalla memoria. Si blocca anche da sola dopo
     10 minuti di inattivita' (2/5/10/30 in Dati).
   - Backup: file .finanze cifrato. Si ripristina dalla schermata di sblocco

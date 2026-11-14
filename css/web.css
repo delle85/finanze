@@ -11,11 +11,23 @@ body.chiusa .app { display: none; }
 .safe { word-break: normal; }
 .safe.avviso { color: var(--out); border-color: rgba(255,176,138,.45); }
 details summary { list-style-position: inside; }
+/* Sezione Conti: una scheda per conto, il totale su tutta la larghezza */
+.conti { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.conto-card { padding: 22px; border-radius: 20px; display: flex; flex-direction: column; gap: 14px; text-align: left; color: inherit; font: inherit; cursor: pointer; border: 1px solid rgba(255,255,255,.10); }
+.conto-card:hover { border-color: rgba(255,255,255,.22); }
+.conto-card h2 { margin: 0; }
+.conto-card .row { display: flex; justify-content: space-between; gap: 12px; }
+.conto-card .v { font-family: var(--mono); font-size: 26px; font-weight: 600; margin-top: 4px; letter-spacing: -0.02em; }
+.conto-card.totale { grid-column: 1 / -1; }
+.conto-righe { display: flex; flex-direction: column; gap: 6px; }
 @media (max-width: 600px) {
   /* sul telefono: Blocca resta visibile nella barra in alto */
   #btn-blocca { margin: 0 0 0 auto !important; min-height: 40px; padding: 0 12px; }
   #btn-blocca svg { display: none; }
   .porta-box { padding: 20px; }
+  .conti { grid-template-columns: 1fr; gap: 10px; }
+  .conto-card { padding: 16px; gap: 10px; }
+  .conto-card .v { font-size: 22px; }
   .toast { left: 12px; right: 12px; bottom: 12px; }
 }
 @media (display-mode: standalone) {

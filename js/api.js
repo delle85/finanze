@@ -271,6 +271,39 @@ function creaApi(M, salva) {
       };
     },
 
+    /* Situazione per conto. Entrate/uscite del periodo senza giroconti; il saldo invece li comprende
+       (spostano soldi tra i conti) ed è la somma di tutti i movimenti del conto fino alla fine del periodo:
+       non conoscendo il saldo iniziale, vale "dal" primo movimento importato di quel conto. */
+    async situazione_conti(da = "", a = "") {
+      const tutto = !(da && a);
+      const out = M.conti.map((c) => {
+        const mm = M.movimenti.filter((m) => m.conto === c.id);
+        let entrate = 0.0, uscite = 0.0, giroconti = 0.0, n = 0, saldo = 0.0, primo = null, ultimo = null;
+        for (const m of mm) {
+          if (primo === null || m.data < primo) primo = m.data;
+          if (ultimo === null || m.data > ultimo) ultimo = m.data;
+          if (tutto || m.data <= a) saldo += m.importo;
+          if (!tutto && (m.data < da || m.data > a)) continue;
+          n++;
+          if (giro(m)) giroconti += m.importo;
+          else if (m.importo >= 0) entrate += m.importo; else uscite += m.importo;
+        }
+        const r2 = C.round2;
+        return { id: c.id, nome: c.nome, tipo: c.tipo, numero: c.numero || null,
+          entrate: r2(entrate), uscite: r2(uscite), giroconti: r2(giroconti), n,
+          saldo: r2(saldo), dal: primo, ultimo, n_totale: mm.length,
+          saldo_valido: Boolean(primo) && (tutto || primo <= a) };
+      });
+      const somma = (k) => C.round2(out.reduce((s, c) => s + c[k], 0));
+      const date = out.map((c) => c.dal).filter(Boolean).sort();
+      return {
+        da, a, tutto, conti: out,
+        totale: { entrate: somma("entrate"), uscite: somma("uscite"), giroconti: somma("giroconti"),
+          n: out.reduce((s, c) => s + c.n, 0), saldo: somma("saldo"),
+          dal: date[0] || null, ultimo: out.map((c) => c.ultimo).filter(Boolean).sort().pop() || null },
+      };
+    },
+
     async regole() {
       return M.regole.slice().sort((x, y) => C.cmp(x.categoria, y.categoria) || C.cmp(x.parola, y.parola))
         .map((r) => ({ id: r.id, parola: r.parola, categoria: r.categoria }));

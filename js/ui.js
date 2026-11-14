@@ -54,6 +54,7 @@ async function render() {
   document.querySelectorAll(".nav-btn").forEach((b) => b.classList.toggle("on", b.dataset.view === S.view));
   if (S.view === "movimenti") return renderMovimenti();
   if (S.view === "riepilogo") return renderRiepilogo();
+  if (S.view === "conti") return renderConti();
   if (S.view === "dati") return renderDati();
   return renderRegole();
 }
@@ -316,7 +317,7 @@ function zoomPeriodo(k) {
   return true;
 }
 
-function barraPeriodo() {
+function barraPeriodo(senzaRaggruppa) {
   const p = S.per;
   const lista = { mese: S.stato.mesi, trimestre: trimestri(), anno: anni() }[p.preset];
   const val = { mese: p.mese, trimestre: p.trim, anno: p.anno }[p.preset];
@@ -332,8 +333,8 @@ function barraPeriodo() {
   return `<div class="periodo glass">
     <div class="seg" role="group" aria-label="Periodo">${PRESET.map(([k, t]) => `<button type="button" data-preset="${k}" class="${p.preset === k ? "on" : ""}">${t}</button>`).join("")}</div>
     <div style="display:flex;align-items:center;gap:8px">${scelta}</div>
-    <div style="display:flex;align-items:center;gap:8px;margin-left:auto"><span class="note">Raggruppa per</span>
-      <div class="seg" role="group" aria-label="Raggruppa per">${GRP.map(([k, t]) => `<button type="button" data-grp="${k}" class="${p.grp === k ? "on" : ""}">${t}</button>`).join("")}</div></div>
+    ${senzaRaggruppa ? "" : `<div style="display:flex;align-items:center;gap:8px;margin-left:auto"><span class="note">Raggruppa per</span>
+      <div class="seg" role="group" aria-label="Raggruppa per">${GRP.map(([k, t]) => `<button type="button" data-grp="${k}" class="${p.grp === k ? "on" : ""}">${t}</button>`).join("")}</div></div>`}
   </div>`;
 }
 
@@ -451,6 +452,55 @@ async function renderRiepilogo() {
   main.querySelectorAll("[data-lato]").forEach((b) => b.onclick = () => { S.lato = b.dataset.lato; render(); });
   main.querySelectorAll("td.c").forEach((td) => td.onclick = () => {
     zoomPeriodo(td.dataset.k); apriDettaglio(td.closest("tr").dataset.riga);
+  });
+}
+
+/* ---------- Conti ---------- */
+function schedaConto(c, totale) {
+  const riga = (t, v, stile = "") => `<div class="row"><span class="note">${t}</span><span class="num" style="${stile}">${v}</span></div>`;
+  const tipo = totale ? `${S.stato.conti.length} conti` : c.tipo === "prepagata" ? "Carta prepagata" : "Conto corrente";
+  const saldo = totale || c.saldo_valido
+    ? `<div class="v">${euro(c.saldo, true)}</div><div class="note">${totale ? "somma dei saldi" : `dal ${dataIt(c.dal)}`}</div>`
+    : `<div class="v" style="color:var(--muted)">—</div><div class="note">${c.dal ? `movimenti solo dal ${dataIt(c.dal)}` : "nessun movimento"}</div>`;
+  const giro = Math.abs(c.giroconti) >= 0.005
+    ? riga("Giroconti ⇄", euro(c.giroconti, true), "color:var(--muted)") : "";
+  return `<button type="button" class="conto-card glass ${totale ? "totale" : ""}" data-conto="${totale ? "" : esc(c.id)}"
+      title="${totale ? "Apri i movimenti di tutti i conti" : `Apri i movimenti di ${esc(c.nome)}`}">
+    <div class="row" style="align-items:baseline"><h2>${esc(totale ? "Totale" : c.nome)}</h2><span class="note">${tipo}</span></div>
+    <div><div class="sub">Saldo${S.per.preset === "tutto" ? "" : " a fine periodo"}</div>${saldo}</div>
+    <div class="conto-righe">
+      ${riga("Entrate", euro(c.entrate, true), "color:var(--in)")}
+      ${riga("Uscite", euro(c.uscite, true), "color:var(--out)")}
+      ${giro}
+      ${riga("Movimenti nel periodo", c.n)}
+      ${riga("Ultimo movimento", c.ultimo ? dataIt(c.ultimo) : "—")}
+    </div>
+  </button>`;
+}
+
+async function renderConti() {
+  if (!S.stato.mesi.length) {
+    $("main").innerHTML = `<div class="head"><div><div class="sub">Saldo ed entrate/uscite di ogni conto</div><h1>Conti</h1></div></div><div class="empty glass" style="border-radius:20px">Ancora nessun dato. Importa un estratto conto da Movimenti.</div>`;
+    return;
+  }
+  const [da, a] = intervallo();
+  const r = await api.situazione_conti(da, a);
+  const piu = r.conti.length > 1;
+  $("main").innerHTML = `
+    <div class="head"><div><div class="sub">Saldo ed entrate/uscite di ogni conto</div><h1>${esc(titoloPeriodo())}</h1></div></div>
+    ${barraPeriodo(true)}
+    <div class="conti">
+      ${r.conti.map((c) => schedaConto(c, false)).join("")}
+      ${piu ? schedaConto(r.totale, true) : ""}
+    </div>
+    <div class="note">Clic su un conto per vederne i movimenti. Entrate e uscite non comprendono i giroconti (ricariche tra conto e carta),
+      che invece spostano il saldo. Il saldo è la somma dei movimenti importati: l'app non conosce il saldo iniziale,
+      quindi vale dalla data indicata e può differire da quello della banca.</div>`;
+  collegaBarraPeriodo();
+  $("main").querySelectorAll("[data-conto]").forEach((b) => b.onclick = () => {
+    S.view = "movimenti"; S.conto = b.dataset.conto; S.cat = ""; S.cerca = "";
+    S.mese = S.per.preset === "mese" ? S.per.mese : "";
+    render();
   });
 }
 
