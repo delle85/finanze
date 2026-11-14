@@ -1,0 +1,21 @@
+/* Aggiunte per la web app (lo stile principale è stile.css, copiato dall'app desktop). */
+body.chiusa .app { display: none; }
+.porta { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; overflow: auto; z-index: 30; }
+.porta[hidden] { display: none; }
+.porta-box { width: min(460px, 100%); padding: 28px; border-radius: 22px; display: flex; flex-direction: column; gap: 16px; margin: auto; }
+.porta-box .brand img { border-radius: 10px; }
+.porta-box .field { gap: 8px; }
+.porta-box .btn { min-height: 48px; }
+.btn:disabled { opacity: .6; cursor: default; }
+#btn-blocca { display: inline-flex; }
+.safe { word-break: normal; }
+@media (max-width: 600px) {
+  /* sul telefono: Blocca resta visibile nella barra in alto */
+  #btn-blocca { margin: 0 0 0 auto !important; min-height: 40px; padding: 0 12px; }
+  #btn-blocca svg { display: none; }
+  .porta-box { padding: 20px; }
+  .toast { left: 12px; right: 12px; bottom: 12px; }
+}
+@media (display-mode: standalone) {
+  .app { padding-top: max(16px, env(safe-area-inset-top)); }
+}

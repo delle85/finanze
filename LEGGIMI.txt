@@ -1,0 +1,58 @@
+FINANZE PERSONALI - WEB APP (fase 1: dati cifrati in locale)
+
+Cos'e'
+  La stessa app del PC, ma nel browser (PC e telefono). I dati sono cifrati
+  con la tua password (AES-256-GCM, chiave da PBKDF2-SHA256 con 600.000
+  iterazioni) e salvati nella memoria del browser di quel dispositivo.
+  Nessuna libreria da siti esterni: tutto e' in questa cartella (SheetJS
+  per Excel e' in lib\). La password non viene mai salvata.
+
+  SE PERDI LA PASSWORD I DATI SONO PERSI: nessuno puo' recuperarli.
+  Scrivila su carta e tienila in un posto sicuro.
+
+Provarla sul PC
+  Doppio clic su strumenti\prova_web.bat (si apre http://localhost:8765).
+  Chiudi la finestra nera per spegnerla.
+
+Primo avvio con i dati dell'app desktop
+  1) Chiudi l'app desktop.
+  2) Apri un prompt nella cartella del programma e lancia:
+        python strumenti\esporta_per_web.py
+     Legge dati\finanze.db SOLO IN LETTURA e crea in Download il file
+     finanze_export_AAAAMMGG.json (IN CHIARO).
+  3) Nella web app: "Importa i dati dall'app desktop", scegli il .json,
+     scegli la password. I dati vengono cifrati.
+  4) Elimina il file .json e svuota il cestino.
+  5) Sezione Dati -> "Scarica backup cifrato" e tienilo su una chiavetta.
+
+Uso
+  - Importa estratto conto: scegli il file scaricato dalla banca (xls, xlsx,
+    csv, anche da telefono). I doppioni vengono riconosciuti come sul PC.
+    Poi elimina il file scaricato: e' in chiaro.
+  - Carte prepagate: importa l'estratto della carta (es. MovimentiCartePrepagate
+    .xlsx). L'app riconosce il numero carta e crea il conto "Prepagata …1234";
+    se il numero manca lo chiede. Usa la data dell'acquisto (Data Movimento) e
+    salta i movimenti "Non contabilizzato" (arrivano col prossimo estratto).
+    Le ricariche dal conto e le "Ricarica" sulla carta (stesso importo, entro
+    3 giorni) vengono abbinate e diventano "Giroconto": non contano come
+    entrate/uscite, contano i singoli acquisti. Le ricariche di carte di cui
+    non hai l'estratto stanno in "Prepagata (non dettagliata)" e restano uscite.
+    Filtro "Conto" in Movimenti e Riepilogo (predefinito: tutti i conti).
+  - Blocca: toglie i dati dalla memoria. Si blocca anche da sola dopo
+    10 minuti di inattivita' (2/5/10/30 in Dati).
+  - Backup: file .finanze cifrato. Si ripristina dalla schermata di sblocco
+    ("Ripristina un backup") con la password di quando e' stato fatto.
+  - Sul telefono: menu del browser -> "Aggiungi a schermata Home".
+  - Una sola finestra alla volta: se modifichi da due finestre, la seconda
+    viene bloccata per non sovrascrivere i dati.
+
+In questa fase i dati NON si sincronizzano tra dispositivi: ognuno ha il
+suo archivio. La sincronizzazione via OneDrive e' la fase 2.
+
+File
+  index.html, css\, js\   interfaccia e logica (js\core.js = core.py,
+                          js\api.js = app.pyw, js\cassaforte.js = cifratura)
+  js\porta.js             sblocco, primo avvio, salvataggio, blocco automatico
+  lib\                    SheetJS 0.20.3 (copia locale, licenza Apache 2.0)
+  sw.js, manifest         installazione come app e uso senza rete
+  ..\strumenti\           esporta_per_web.py (migrazione), prova_web.bat
