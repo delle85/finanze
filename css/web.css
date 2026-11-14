@@ -25,6 +25,56 @@ details summary { list-style-position: inside; }
   #btn-blocca { margin: 0 0 0 auto !important; min-height: 40px; padding: 0 12px; }
   #btn-blocca svg { display: none; }
   .porta-box { padding: 20px; }
+  /* telefono: niente scorrimento laterale */
+  main { gap: 12px; }
+  h1 { font-size: 24px; }
+  .head { gap: 10px; }
+  .head .btn.primary { min-height: 40px; }
+  .kpis { gap: 8px; }
+  .kpi { padding: 10px 12px; border-radius: 14px; }
+  .kpi .sub { font-size: 12px; }
+  .kpi .v { font-size: 16px; margin-top: 4px; }
+  /* filtri dei movimenti: griglia a due colonne, senza etichette (il primo valore dice già cosa sono) */
+  .filters.compatti { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+  .filters.compatti .field { min-width: 0; gap: 0; }
+  .filters.compatti label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .filters.compatti .input { min-width: 0 !important; width: 100%; min-height: 38px; padding: 0 10px; border-radius: 10px; font-size: 16px; }
+  .filters.compatti .field:last-of-type:nth-child(odd) { grid-column: 1 / -1; }
+  .filters.compatti .btn { grid-column: 1 / -1; min-height: 38px; justify-content: center; }
+  /* movimenti: ogni riga diventa una scheda su due righe (descrizione e importo, poi data e categoria) */
+  table.lista, table.lista tbody { display: block; min-width: 0; }
+  table.lista thead { display: none; }
+  table.lista tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; align-items: center; padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,.05); }
+  table.lista td { display: block; padding: 0; border: 0; min-width: 0; }
+  table.lista td:nth-child(2) { grid-area: 1 / 1; font-size: 14px; overflow-wrap: anywhere; }
+  table.lista td:nth-child(4) { grid-area: 1 / 2; font-size: 14px; align-self: start; }
+  table.lista td:nth-child(1) { grid-area: 2 / 1; font-size: 12px; }
+  table.lista td:nth-child(3) { grid-area: 2 / 2; justify-self: end; }
+  table.lista .chip { min-height: 26px; padding: 0 10px; font-size: 11px; max-width: 46vw; overflow: hidden; text-overflow: ellipsis; }
+  table.lista .sugg { justify-content: flex-end; }
+  table.lista .ok-btn { min-height: 26px; }
+  table.regole { min-width: 0; }
+  table.regole td, table.regole th { padding: 8px 10px; }
+  table.regole td:first-child { overflow-wrap: anywhere; font-size: 13px; }
+  /* barra del periodo più bassa */
+  .periodo { gap: 8px; padding: 8px; border-radius: 14px; }
+  .periodo .seg button { min-height: 30px; padding: 0 9px; font-size: 12px; }
+  .periodo .input { min-height: 36px; font-size: 16px; flex: 1; min-width: 0 !important; }
+  .periodo .freccia { width: 36px; height: 36px; flex-shrink: 0; }
+  .periodo > div:nth-child(2) { width: 100%; }
+  .periodo > .seg:first-child { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; border-radius: 14px; }
+  .periodo > .seg:first-child button { border-radius: 10px; padding: 0 4px; }
+  /* scelta del conto nell'intestazione (Riepilogo): una riga sola */
+  .head .field { flex-direction: row; align-items: center; gap: 8px; width: 100%; }
+  .head .field .input { flex: 1; min-width: 0 !important; min-height: 38px; font-size: 16px; padding: 0 10px; border-radius: 10px; }
+  /* tabella categorie x periodi: sul telefono solo Totale e Media (i singoli periodi sono nel grafico) */
+  .cat-row { width: 100%; margin: 0; }
+  table.andamento tr > :nth-child(5) { display: none; }
+  table.andamento td, table.andamento th { font-size: 11px !important; }
+  table.andamento tr > :not(:first-child) { padding-left: 8px !important; }
+  .mat-wrap { overflow-x: visible; margin: 0; padding: 0; }
+  .mat tr > :not(:first-child):not(:nth-last-child(-n+2)) { display: none; }
+  .mat th:first-child, .mat td:first-child { white-space: normal; overflow-wrap: anywhere; position: static; background: transparent; }
   .conti { grid-template-columns: 1fr; gap: 10px; }
   .conto-card { padding: 16px; gap: 10px; }
   .conto-card .v { font-size: 22px; }

@@ -79,17 +79,17 @@ async function renderMovimenti() {
       <div class="kpi glass"><div class="sub">Saldo</div><div class="v">${euro(r.entrate + r.uscite, true)}</div></div>
       <div class="kpi glass"><div class="sub">Da categorizzare</div><div class="v" style="color:var(--accent)">${r.da_categorizzare}</div></div>
     </div>
-    <div class="filters">
+    <div class="filters compatti">
       ${campoConto("f-conto")}
       <div class="field"><label for="f-mese">Mese</label><select class="input" id="f-mese" style="min-width:180px">${opzioniMese()}</select></div>
       <div class="field"><label for="f-cat">Categoria</label><select class="input" id="f-cat" style="min-width:200px">
-        <option value="">Tutte</option><option value="${NON_CAT}" ${S.cat === NON_CAT ? "selected" : ""}>Da categorizzare</option>
+        <option value="">Tutte le categorie</option><option value="${NON_CAT}" ${S.cat === NON_CAT ? "selected" : ""}>Da categorizzare</option>
         ${cats.map((c) => `<option ${c === S.cat ? "selected" : ""}>${esc(c)}</option>`).join("")}</select></div>
       <div class="field" style="flex:1 1 240px"><label for="f-cerca">Cerca</label><input class="input" id="f-cerca" type="search" placeholder="Esselunga, Iren, bonifico…" value="${esc(S.cerca)}"></div>
       ${r.suggerimenti ? `<button class="btn" type="button" id="btn-sugg" style="border-color:rgba(110,240,200,.5)">Accetta ${r.suggerimenti} suggerimenti</button>` : ""}
     </div>
     <div class="panel glass">
-      ${r.righe.length ? `<table>
+      ${r.righe.length ? `<table class="lista">
         <thead><tr><th>Data</th><th>Descrizione</th><th>Categoria</th><th style="text-align:right">Importo</th></tr></thead>
         <tbody>${r.righe.map(rigaHtml).join("")}</tbody></table>`
       : `<div class="empty">${S.stato.mesi.length ? "Nessun movimento con questi filtri." : "Nessun movimento ancora.<br>Scarica la lista movimenti in Excel dal sito BNL e premi <b>Importa estratto conto</b>."}</div>`}
@@ -434,7 +434,7 @@ async function renderRiepilogo() {
       <section class="card glass">
         <div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px"><h2>Andamento per ${GRP_SING[r.grp]}</h2>${legenda}</div>
         ${grafico(r.serie, true)}
-        <div style="overflow-x:auto"><table style="min-width:0;font-size:13px">
+        <div style="overflow-x:auto"><table class="andamento" style="min-width:0;font-size:13px">
           <thead><tr><th style="padding:8px 0">Periodo</th><th style="padding:8px 0;text-align:right">Entrate</th><th style="padding:8px 0;text-align:right">Uscite</th><th style="padding:8px 0;text-align:right">Risparmio</th><th style="padding:8px 0;text-align:right">Tasso</th></tr></thead>
           <tbody>${r.serie.slice().reverse().map((s) => `<tr class="zoom-row" data-k="${s.periodo}"><td style="padding:9px 0">${etichetta(s.periodo, true)}</td>
             <td class="num" style="padding:9px 0;color:var(--in);font-size:12px">${euro(s.entrate, true)}</td>
@@ -576,7 +576,7 @@ async function renderDettaglio() {
       </section>
     </div>
     <div class="panel glass">
-      ${righe.length ? `<table>
+      ${righe.length ? `<table class="lista">
         <thead><tr><th>Data</th><th>Descrizione</th><th>Categoria</th><th style="text-align:right">Importo</th></tr></thead>
         <tbody>${righe.map(rigaHtml).join("")}</tbody></table>` : `<div class="empty">Nessun movimento.</div>`}
     </div>
@@ -605,7 +605,7 @@ async function renderRegole() {
         <datalist id="g-cats">${S.stato.categorie.map((c) => `<option value="${esc(c)}">`).join("")}</datalist></div>
       <button class="btn primary" type="button" id="g-add">Aggiungi regola</button>
     </div>
-    <div class="panel glass"><table>
+    <div class="panel glass"><table class="regole">
       <thead><tr><th>Parola</th><th>Categoria</th><th></th></tr></thead>
       <tbody>${regole.map((g) => `<tr style="cursor:default"><td style="font-family:var(--mono)">${esc(g.parola)}</td>
         <td><span class="chip"><span class="dot" style="background:${coloreCat(g.categoria)}"></span>${esc(g.categoria)}</span></td>
