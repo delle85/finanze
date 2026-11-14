@@ -36,25 +36,40 @@ const posizioneDa = (item) => ({ driveId: item.parentReference.driveId, itemId: 
 
 /* Metadati del file: eTag e indirizzo temporaneo per scaricarlo (Graph non permette di scaricare
    /content da una pagina web per via del reindirizzamento: si usa downloadUrl, già autorizzato). */
+/* Senza $select: con gli account personali il filtro può far sparire downloadUrl.
+   Se l'indirizzo con driveId non trova il file, si riprova con /me/drive (il proprio OneDrive). */
+async function leggiItem(pos) {
+  try { return await graph(`/drives/${encodeURIComponent(pos.driveId)}/items/${encodeURIComponent(pos.itemId)}`); }
+  catch (e) {
+    if (!(e instanceof NonTrovato)) throw e;
+    return graph(`/me/drive/items/${encodeURIComponent(pos.itemId)}`);
+  }
+}
+
 async function meta(pos) {
-  const it = await graph(`/drives/${encodeURIComponent(pos.driveId)}/items/${encodeURIComponent(pos.itemId)}?$select=id,name,eTag,size,lastModifiedDateTime,lastModifiedBy,parentReference,@microsoft.graph.downloadUrl`);
-  return { eTag: it.eTag, url: it["@microsoft.graph.downloadUrl"], modificato: it.lastModifiedDateTime,
+  const it = await leggiItem(pos);
+  return { eTag: it.eTag, url: it["@microsoft.graph.downloadUrl"] || null, modificato: it.lastModifiedDateTime,
     da: it.lastModifiedBy && it.lastModifiedBy.user ? it.lastModifiedBy.user.displayName : "", posizione: posizioneDa(it) };
 }
 
 async function scarica(pos) {
   const m = await meta(pos);
+  if (!m.url || !/^https:\/\//i.test(m.url)) throw new Error("OneDrive non ha dato l'indirizzo per scaricare il file.");
   let r;
-  try { r = await fetch(m.url, { cache: "no-store" }); } catch (e) { throw new ErroreRete("Download da OneDrive non riuscito."); }
+  try { r = await fetch(m.url, { cache: "no-store", credentials: "omit" }); } catch (e) { throw new ErroreRete("Download da OneDrive non riuscito."); }
   if (!r.ok) throw new Error(`Download da OneDrive: errore ${r.status}`);
   return { testo: await r.text(), eTag: m.eTag, meta: m };
 }
 
 /* Scrive il file solo se su OneDrive c'è ancora la versione eTag (altrimenti Conflitto). */
 async function carica(pos, testo, eTag) {
-  const it = await graph(`/drives/${encodeURIComponent(pos.driveId)}/items/${encodeURIComponent(pos.itemId)}/content`, {
-    metodo: "PUT", corpo: testo, intestazioni: { "Content-Type": "text/plain", "If-Match": eTag },
-  });
+  const opz = { metodo: "PUT", corpo: testo, intestazioni: { "Content-Type": "text/plain", "If-Match": eTag } };
+  let it;
+  try { it = await graph(`/drives/${encodeURIComponent(pos.driveId)}/items/${encodeURIComponent(pos.itemId)}/content`, opz); }
+  catch (e) {
+    if (!(e instanceof NonTrovato)) throw e;
+    it = await graph(`/me/drive/items/${encodeURIComponent(pos.itemId)}/content`, opz);
+  }
   return { eTag: it.eTag, posizione: posizioneDa(it) };
 }
 
