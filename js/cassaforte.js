@@ -29,6 +29,16 @@ async function derivaChiave(password, salt, iterazioni) {
     base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
 }
 
+/* Per lo sblocco con impronta: gli stessi 256 bit di derivaChiave, in chiaro (vanno subito cifrati). */
+async function chiaveGrezza(password, salt, iterazioni) {
+  const base = await crypto.subtle.importKey("raw", enc.encode(password.normalize("NFC")), "PBKDF2", false, ["deriveBits"]);
+  return new Uint8Array(await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations: iterazioni }, base, 256));
+}
+async function sessioneDaGrezza(grezza, salt, iterazioni) {
+  const chiave = await crypto.subtle.importKey("raw", grezza, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+  return { chiave, salt, iterazioni };
+}
+
 /* Sessione di cifratura: chiave in memoria (non estraibile), salt e iterazioni. */
 async function nuovaSessione(password) {
   const salt = casuali(16);
@@ -118,10 +128,14 @@ async function op(modo, fn) {
 const archivioLeggi = () => op("readonly", (s) => s.get(CHIAVE));
 const archivioScrivi = (rec) => op("readwrite", (s) => s.put(rec, CHIAVE));
 const archivioCancella = () => op("readwrite", (s) => s.delete(CHIAVE));
+/* Altri record dello stesso archivio (es. "impronta"). */
+const recordLeggi = (k) => op("readonly", (s) => s.get(k));
+const recordScrivi = (k, v) => op("readwrite", (s) => s.put(v, k));
+const recordCancella = (k) => op("readwrite", (s) => s.delete(k));
 
 G.Cassaforte = {
-  ITERAZIONI, PasswordErrata, FileNonValido,
-  nuovaSessione, cifra, apri, decifraCon, leggiIntestazione, stessaChiave,
-  archivioLeggi, archivioScrivi, archivioCancella,
+  ITERAZIONI, PasswordErrata, FileNonValido, b64, daB64,
+  nuovaSessione, cifra, apri, decifraCon, leggiIntestazione, stessaChiave, chiaveGrezza, sessioneDaGrezza,
+  archivioLeggi, archivioScrivi, archivioCancella, recordLeggi, recordScrivi, recordCancella,
 };
 })(globalThis);

@@ -45,6 +45,13 @@ Uso
     il saldo iniziale, quindi vale "dal" primo movimento di quel conto (per una
     carta, dal primo estratto importato) e puo' differire da quello della banca.
     Clic su una scheda: apre Movimenti filtrati su quel conto.
+  - Sblocco con impronta (Dati > Sblocco con impronta): su ogni dispositivo si
+    attiva a parte (password + impronta). Crea una passkey del sito e usa la
+    sua estensione PRF per cifrare la chiave dei dati, che resta solo su quel
+    dispositivo; la password non viene salvata. Dopo un cambio password
+    l'impronta si disattiva da sola e va riattivata. Serve un browser con
+    supporto PRF (Chrome su Android, Safari su iPhone con iOS 18 o successivo);
+    altrimenti l'app lo dice e si continua con la password.
   - Blocca: toglie i dati dalla memoria. Si blocca anche da sola dopo
     10 minuti di inattivita' (2/5/10/30 in Dati).
   - Backup: file .finanze cifrato. Si ripristina dalla schermata di sblocco

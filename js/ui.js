@@ -690,10 +690,22 @@ function collegaCardOneDrive() {
 async function renderDati() {
   const P = window.Porta, info = await P.info();
   const quando = info.salvato_il ? new Date(info.salvato_il).toLocaleString("it-IT") : "—";
+  const imp = await P.impronta();
   $("main").innerHTML = `
     <div class="head"><div><div class="sub">Archivio cifrato, OneDrive, backup, password</div><h1>Dati</h1></div></div>
     <div class="cards">
       ${cardOneDrive(info)}
+      <section class="card glass">
+        <h2>Sblocco con impronta</h2>
+        ${imp.disponibile ? `<div class="note">Su <b>questo dispositivo</b> puoi aprire l'app con l'impronta (o il volto / il PIN del telefono) invece di scrivere la password.
+          La password non viene salvata: l'impronta sblocca una chiave cifrata che resta qui. La password resta necessaria sugli altri dispositivi,
+          dopo un cambio password e se l'impronta non funziona: non dimenticarla.</div>
+          <div class="row"><span>Stato</span><span class="date">${imp.attivo ? "attivo" : "non attivo"}</span></div>
+          <div>${imp.attivo ? `<button class="btn" type="button" id="d-imp-off">Disattiva</button>`
+            : `<button class="btn primary" type="button" id="d-imp-on">Attiva lo sblocco con impronta</button>`}</div>`
+        : `<div class="note">Questo dispositivo o browser non ha un sensore utilizzabile dalle app web (serve un telefono con impronta o volto,
+          o un PC con Windows Hello). Continua a usare la password.</div>`}
+      </section>
       <section class="card glass">
         <h2>Su questo dispositivo</h2>
         <div class="note">Una copia <b>cifrata</b> (AES-256) dei dati sta nella memoria di questo browser: serve per aprire l'app subito e anche senza rete.
@@ -732,6 +744,13 @@ async function renderDati() {
       </section>
     </div>`;
   collegaCardOneDrive();
+  if ($("d-imp-on")) $("d-imp-on").onclick = async () => {
+    const pw = await window.chiediPassword("Attiva lo sblocco con impronta", "Inserisci la password dei dati, poi conferma con l'impronta quando il telefono la chiede.");
+    if (pw === null) return;
+    try { await P.attivaImpronta(pw); toast("Sblocco con impronta attivo"); render(); }
+    catch (e) { if (!e.annullato) window.avviso("Impronta", esc(e.message || String(e))); }
+  };
+  if ($("d-imp-off")) $("d-imp-off").onclick = async () => { await P.disattivaImpronta(); toast("Sblocco con impronta disattivato"); render(); };
   $("d-backup").onclick = () => P.scaricaBackup();
   $("main").querySelectorAll("[data-min]").forEach((b) => b.onclick = async () => { await P.impostaBlocco(+b.dataset.min); toast(`Blocco dopo ${b.dataset.min} minuti`); render(); });
   $("d-cambia").onclick = async () => {

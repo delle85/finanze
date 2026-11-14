@@ -10,7 +10,7 @@
    Su OneDrive va solo il testo cifrato. */
 (function () {
 "use strict";
-const K = window.Cassaforte, A = window.FinApi, MS = window.Microsoft, N = window.Nuvola, U = window.Unione;
+const K = window.Cassaforte, A = window.FinApi, MS = window.Microsoft, N = window.Nuvola, U = window.Unione, I = window.Impronta;
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const MIN_PASSWORD = 10;
@@ -300,13 +300,24 @@ const Porta = window.Porta = {
     sessione = await K.nuovaSessione(nuova);
     modello.rev = (modello.rev || 0) + 1;
     await salva();
+    await I.disattiva();          // la chiave è cambiata: l'impronta va riattivata
   },
   async eliminaTutto() {
     await coda;
     await K.archivioCancella();
+    await I.disattiva();
     bloccaSubito();
   },
   sincronizza: () => sincronizza(),
+  /* Sblocco con impronta su questo dispositivo */
+  async impronta() { return { disponibile: await I.disponibile(), attivo: await I.attivo() }; },
+  async attivaImpronta(password) {
+    await coda;
+    const rec = await K.archivioLeggi();
+    try { await I.attiva(password, rec.testo); }
+    catch (e) { if (e instanceof K.PasswordErrata) throw new Error("Password errata."); throw e; }
+  },
+  disattivaImpronta: () => I.disattiva(),
   /* Va alla pagina di accesso Microsoft; i dati sono già salvati, al ritorno si sblocca di nuovo. */
   async accediMicrosoft(dopo = "", link = "") {
     await coda;
@@ -415,8 +426,12 @@ async function schermataSblocco(rit) {
   const rec = await K.archivioLeggi();
   const online = rec && rec.nuvola;
   const serveMs = online && !MS.collegato();
+  const conImpronta = await I.attivo() && await I.disponibile();
   mostra(`${riquadroMessaggio()}${MARCHIO}
     <h2 style="font-size:24px">Sblocca</h2>
+    ${conImpronta ? `<button class="btn primary" type="button" id="p-impronta" style="justify-content:center">Sblocca con impronta</button>
+      <div class="note" id="p-err-imp" hidden style="color:var(--out)"></div>
+      <div class="note" style="text-align:center">oppure con la password</div>` : ""}
     ${serveMs ? `<div class="box"><b>Non sei collegato a Microsoft</b><div class="note">Puoi sbloccare e usare i dati di questo dispositivo, ma per ricevere e inviare
       le modifiche su OneDrive devi accedere.${rit && rit.errore && !rit.serveAccesso ? `<br><span style="color:var(--out)">${esc(rit.errore)}</span>` : ""}</div>
       <button class="btn" type="button" id="p-ms" style="justify-content:center">Accedi con Microsoft</button></div>` : ""}
@@ -444,6 +459,24 @@ async function schermataSblocco(rit) {
   };
   if ($("p-ms")) $("p-ms").onclick = () => MS.accedi({});
   $("p-ripristina").onclick = () => schermataRipristino(true);
+  if (conImpronta) {
+    $("p-pw").blur();
+    $("p-ok").classList.remove("primary");
+    const b = $("p-impronta"), err = (m) => { $("p-err-imp").textContent = m; $("p-err-imp").hidden = !m; };
+    b.onclick = async () => {
+      err(""); b.disabled = true; b.textContent = "Sblocco…";
+      try {
+        const r = await K.archivioLeggi();
+        const s = await I.sblocca(r.testo);
+        await entra(await K.decifraCon(s, r.testo), s, r.rev);
+      } catch (e) {
+        b.disabled = false; b.textContent = "Sblocca con impronta";
+        if (e.annullato) return;
+        err(e.message || String(e));
+        if (e instanceof I.ImprontaNonValida) { await I.disattiva(); b.hidden = true; $("p-pw").focus(); }
+      }
+    };
+  }
 }
 
 async function schermataBenvenuto(rit) {
