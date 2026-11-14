@@ -11,6 +11,11 @@ body.chiusa .app { display: none; }
 .safe { word-break: normal; }
 .safe.avviso { color: var(--out); border-color: rgba(255,176,138,.45); }
 details summary { list-style-position: inside; }
+/* Grafico andamento: barre che si adattano alla larghezza */
+.chart .col > div { width: min(14px, calc(50% - 2px)); }
+.chart-lab { display: grid; gap: 10px; margin-top: 6px; }
+.chart-lab .note { text-align: center; white-space: nowrap; overflow: hidden; }
+.lab-s { display: none; }
 /* Sezione Conti: una scheda per conto, il totale su tutta la larghezza */
 .conti { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
 .conto-card { padding: 22px; border-radius: 20px; display: flex; flex-direction: column; gap: 14px; text-align: left; color: inherit; font: inherit; cursor: pointer; border: 1px solid rgba(255,255,255,.10); }
@@ -69,6 +74,11 @@ details summary { list-style-position: inside; }
   .head .field .input { flex: 1; min-width: 0 !important; min-height: 38px; font-size: 16px; padding: 0 10px; border-radius: 10px; }
   /* tabella categorie x periodi: sul telefono solo Totale e Media (i singoli periodi sono nel grafico) */
   .cat-row { width: 100%; margin: 0; }
+  .chart, .chart-lab { gap: 4px; }
+  .chart .col { gap: 2px; }
+  .chart-lab .note { white-space: normal; line-height: 1.2; }
+  .lab-l { display: none; }
+  .lab-s { display: inline; }
   table.andamento tr > :nth-child(5) { display: none; }
   table.andamento td, table.andamento th { font-size: 11px !important; }
   table.andamento tr > :not(:first-child) { padding-left: 8px !important; }

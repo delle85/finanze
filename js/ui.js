@@ -373,16 +373,28 @@ function deltas(cur, chiave, conf, meglio) {
 function grafico(serie, cliccabile) {
   if (!serie.length) return `<div class="empty">Ancora nessun dato.</div>`;
   const max = Math.max(1, ...serie.map((s) => Math.max(s.entrate, -s.uscite)));
-  const cols = `repeat(${serie.length},minmax(34px,1fr))`;
+  // le colonne si stringono per stare nello schermo; si scorre solo con moltissimi periodi
+  const cols = `repeat(${serie.length},minmax(0,1fr))`;
   const h = (v) => v ? Math.max(2, Math.round(v / max * 180)) : 0;
-  return `<div class="chart-wrap"><div style="min-width:${serie.length * 44}px">
+  const stessoAnno = new Set(serie.map((s) => s.periodo.slice(0, 4))).size === 1;
+  const lab = (k) => {
+    if (k.length === 7 && !k.includes("T")) {          // mese: "Gen" (se tutti dello stesso anno) o "Gen 25"; sul telefono "G"
+      const m = MESI[+k.slice(5, 7) - 1];
+      const corto = serie.length > 7 ? m[0] : m.slice(0, 3);
+      const anno = !stessoAnno && (k.slice(5, 7) === "01" || k === serie[0].periodo) ? `<br>’${k.slice(2, 4)}` : "";
+      return `<span class="lab-l">${stessoAnno ? m.slice(0, 3) : etichetta(k)}</span><span class="lab-s">${corto}${anno}</span>`;
+    }
+    if (k.includes("T")) return `<span class="lab-l">${etichetta(k)}</span><span class="lab-s">${stessoAnno ? "T" + k.slice(-1) : etichetta(k).replace(" ", "<br>")}</span>`;
+    return `<span class="lab-l">${k}</span><span class="lab-s">${serie.length > 6 ? "’" + k.slice(2) : k}</span>`;
+  };
+  return `<div class="chart-wrap"><div style="min-width:${serie.length * 12}px">
     <div class="chart" style="grid-template-columns:${cols}">
       ${serie.map((s) => `<div class="col ${cliccabile ? "zoom" : ""}" data-k="${s.periodo}" title="${etichetta(s.periodo, true)}&#10;Entrate ${euro(s.entrate)}&#10;Uscite ${euro(s.uscite)}${cliccabile ? "&#10;Clic per aprire il periodo" : ""}">
         ${s.entrate ? `<div style="background:var(--in);box-shadow:0 0 14px rgba(110,240,200,.35);height:${h(s.entrate)}px"></div>` : ""}
         ${s.uscite ? `<div style="background:var(--out);box-shadow:0 0 14px rgba(255,176,138,.35);height:${h(-s.uscite)}px"></div>` : ""}</div>`).join("")}
     </div>
-    <div style="display:grid;gap:10px;margin-top:6px;grid-template-columns:${cols}">
-      ${serie.map((s) => `<div class="note" style="text-align:center">${etichetta(s.periodo)}</div>`).join("")}</div>
+    <div class="chart-lab" style="grid-template-columns:${cols}">
+      ${serie.map((s) => `<div class="note">${lab(s.periodo)}</div>`).join("")}</div>
   </div></div>`;
 }
 
