@@ -141,6 +141,15 @@ function scadenze(c, rif = oggi()) {
   return { fine, disdetta, periodo, scaduto: fine < rif, rinnovo };
 }
 
+/* Per i moduli: scadenza in corso di una polizza (decorrenza + durata, con i rinnovi taciti fino a oggi). */
+function scadenzaPolizza(decorrenza, durata, tacito, rif = oggi()) {
+  if (!valida(decorrenza)) return null;
+  const d = intero(durata, 1, 120, 12);
+  let fine = piuMesi(decorrenza, d), k = 1;
+  while (tacito && fine < rif && k++ < 400) fine = piuMesi(decorrenza, d * k);
+  return fine;
+}
+
 /* Prossimo anniversario dalla data di inizio (per ISTAT e imposta di registro annuale). */
 function prossimoAnniversario(inizio, rif) {
   if (!valida(inizio)) return null;
@@ -757,7 +766,7 @@ function creaAffitti(M, modificato) {
       allegati: M.allegati.filter((x) => x.assicurazione === id).map((x) => ({ id: x.id, nome: x.nome, tipo: x.tipo, byte: x.byte, aggiunto_il: x.aggiunto_il })) } : null; },
     async salva_assicurazione(x) {
       if (!testo(x.compagnia)) return { ok: false, errore: "Scrivi la compagnia assicurativa." };
-      if (!valida(x.decorrenza)) return { ok: false, errore: "Indica la data di decorrenza (inizio copertura)." };
+      if (!valida(x.decorrenza)) return { ok: false, errore: "Indica la decorrenza (inizio copertura) o la scadenza della polizza." };
       const v = x.id ? perId("assicurazioni", x.id) : null;
       const r = sostituisci("assicurazioni", pulisciAssic(x, v));
       await modificato();
@@ -1309,5 +1318,5 @@ function analizzaFoglio(righe) {
     mancanti: ["indirizzo", "inq_nome", "canone"].filter((k) => col[k] === undefined).map((k) => CAMPI_IMPORT[k]) };
 }
 
-G.FinAffitti = { analizzaFoglio, CAMPI_IMPORT, creaAffitti, migra, LISTE, TIPI, TIPI_SPESA, TIPI_ASSIC, CONTRAENTI, REGIMI, RELAZIONI, TIPOLOGIE, CAT_AFFITTI, MODELLO_BASE, durataTesto };
+G.FinAffitti = { analizzaFoglio, CAMPI_IMPORT, scadenze, scadenzaPolizza, piuMesi, piuGiorni, oggi, creaAffitti, migra, LISTE, TIPI, TIPI_SPESA, TIPI_ASSIC, CONTRAENTI, REGIMI, RELAZIONI, TIPOLOGIE, CAT_AFFITTI, MODELLO_BASE, durataTesto };
 })(globalThis);

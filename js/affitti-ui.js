@@ -534,7 +534,8 @@ async function apriFormContratto(id, pre = null) {
         <div class="field"><label for="fc-tipo">Tipo di contratto</label><select class="input" id="fc-tipo">${tipi.map((t) => `<option value="${esc(t.id)}" ${t.id === x.tipo ? "selected" : ""}>${esc(t.nome)}${t.personalizzato ? " ★" : ""}</option>`).join("")}
           <option value="__nuovo">+ Crea un nuovo tipo…</option></select></div>
         <div class="field"><label for="fc-regime">Regime fiscale</label><select class="input" id="fc-regime">${Object.entries(REG).map(([k, t]) => `<option value="${k}" ${k === x.regime ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></div>
-        <div class="field"><label for="fc-inizio">Data di inizio${x.inizio_stimato ? ` <span class="stato giallo" style="min-height:0">stimata</span>` : ""}</label><input class="input" id="fc-inizio" type="date" value="${esc(x.inizio || "")}"></div>
+        <div class="field"><label for="fc-inizio">Data di inizio <span class="stato giallo" id="fc-stima" style="min-height:0" ${x.inizio_stimato ? "" : "hidden"}>stimata</span></label><input class="input" id="fc-inizio" type="date" value="${esc(x.inizio || "")}"></div>
+        <div class="field"><label for="fc-scad">Scadenza</label><input class="input" id="fc-scad" type="date" value="${esc(x.inizio ? FinAffitti.scadenze(x).fine || "" : "")}"></div>
         <div class="field"><label for="fc-durata">Durata (mesi)</label><input class="input" id="fc-durata" inputmode="numeric" value="${esc(x.durata_mesi ?? "")}"></div>
         <div class="field"><label for="fc-rinnovo">Rinnovo automatico (mesi, 0 = no)</label><input class="input" id="fc-rinnovo" inputmode="numeric" value="${esc(x.rinnovo_mesi ?? 0)}"></div>
         <div class="field"><label for="fc-preavviso">Preavviso disdetta (mesi)</label><input class="input" id="fc-preavviso" inputmode="numeric" value="${esc(x.preavviso_mesi ?? 0)}"></div>
@@ -552,7 +553,7 @@ async function apriFormContratto(id, pre = null) {
         <div class="field"><label for="fc-incassi">Controlla i pagamenti dal mese</label><input class="input" id="fc-incassi" type="month" value="${esc(x.incassi_dal || "")}"></div>
       </div>
       <div class="note">«Controlla i pagamenti dal mese»: lascialo vuoto per controllare tutto dall'inizio del contratto. Serve per i contratti iniziati prima che usassi l'app: i mesi precedenti non risultano da incassare.</div></div>
-    ${x.inizio_stimato ? `<div class="note" style="color:var(--warn)">La data di inizio è stata ricavata dalla scadenza (import da Excel): correggila se la conosci.</div>` : ""}
+    <div class="note" id="fc-stima-nota" style="color:var(--warn)" ${x.inizio_stimato ? "" : "hidden"}>La data di inizio è ricavata dalla scadenza e dalla durata: correggila se la conosci.</div>
     ${id ? `<div class="form-griglia"><div class="field"><label for="fc-chiuso">Chiuso il (inquilino uscito)</label><input class="input" id="fc-chiuso" type="date" value="${esc(x.chiuso_il || "")}"></div></div>` : ""}
     <div class="field"><label for="fc-note">Note</label><textarea class="input" id="fc-note" rows="3" style="min-height:80px;font-family:inherit">${esc(x.note || "")}</textarea></div>
     <div class="actions"><button class="btn" type="button" id="m-annulla">Annulla</button><button class="btn primary" type="button" id="fc-ok">Salva contratto</button></div>`, true);
@@ -592,10 +593,31 @@ async function apriFormContratto(id, pre = null) {
   m.querySelectorAll(".soldi").forEach((i) => i.oninput = totale);
   totale();
 
+  // inizio e scadenza collegati: se conosci solo la scadenza, l'inizio si ricava (e resta segnato come stimato)
+  let inizioStimato = Boolean(x.inizio_stimato);
+  const segnaStima = () => { $("fc-stima").hidden = !inizioStimato; $("fc-stima-nota").hidden = !inizioStimato; };
+  const daInizio = () => {
+    if (!val("fc-inizio")) return;
+    $("fc-scad").value = FinAffitti.scadenze({ inizio: val("fc-inizio"), durata_mesi: val("fc-durata"), rinnovo_mesi: val("fc-rinnovo"), preavviso_mesi: val("fc-preavviso") }).fine || "";
+  };
+  const daScadenza = () => {
+    const sc = val("fc-scad");
+    if (!sc) return;
+    const durata = parseInt(val("fc-durata"), 10) || 12;
+    $("fc-inizio").value = FinAffitti.piuMesi(FinAffitti.piuGiorni(sc, 1), -durata);
+    inizioStimato = true; segnaStima();
+  };
+  const ricalcola = () => (inizioStimato && val("fc-scad") ? daScadenza() : daInizio());
+  $("fc-inizio").onchange = () => { inizioStimato = false; segnaStima(); daInizio(); };
+  $("fc-scad").onchange = daScadenza;
+  $("fc-durata").addEventListener("input", ricalcola);
+  $("fc-rinnovo").addEventListener("input", daInizio);
+
   let tipoPrima = x.tipo;
   const applicaTipo = (t) => {
     $("fc-durata").value = t.durata; $("fc-rinnovo").value = t.rinnovo; $("fc-preavviso").value = t.preavviso;
     $("fc-regime").value = t.regime || "ordinario"; $("fc-istat").checked = Boolean(t.istat); $("fc-istat-l").hidden = $("fc-regime").value === "cedolare";
+    ricalcola();
   };
   $("fc-tipo").onchange = () => {
     if (val("fc-tipo") === "__nuovo") {
@@ -624,7 +646,7 @@ async function apriFormContratto(id, pre = null) {
       canone: val("fc-canone"), spese_mensili: val("fc-spese"), quota_amministrazione: val("fc-amm"), giorno_pagamento: val("fc-giorno"), deposito: val("fc-dep"),
       istat: $("fc-istat").checked, chiuso_il: id ? val("fc-chiuso") : null, note: val("fc-note"),
       n_persone: val("fc-npers"), n_minori: val("fc-nmin"), incassi_dal: val("fc-incassi"),
-      inizio_stimato: Boolean(x.inizio_stimato) && val("fc-inizio") === x.inizio,
+      inizio_stimato: inizioStimato,
     };
   }
   $("fc-ok").onclick = async () => {

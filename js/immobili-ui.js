@@ -365,6 +365,7 @@ async function apriPolizza(a, dopo = () => render()) {
       <div class="field"><label for="po-premio">Premio annuo (€)</label><input class="input" id="po-premio" inputmode="decimal" value="${esc(importoIt(x.premio))}"></div>
       <div class="field"><label for="po-fraz">Pagamento</label><select class="input" id="po-fraz">${FR.map(([k, t]) => `<option value="${k}" ${k === (+x.frazionamento || 1) ? "selected" : ""}>${t}</option>`).join("")}</select></div>
       <div class="field"><label for="po-dec">Decorrenza (inizio copertura)</label><input class="input" id="po-dec" type="date" value="${esc(x.decorrenza || "")}"></div>
+      <div class="field"><label for="po-scad">Scadenza</label><input class="input" id="po-scad" type="date" value="${esc(x.decorrenza ? FinAffitti.scadenzaPolizza(x.decorrenza, x.durata_mesi, x.tacito_rinnovo !== false) || "" : "")}"></div>
       <div class="field"><label for="po-dur">Durata (mesi)</label><input class="input" id="po-dur" inputmode="numeric" value="${esc(x.durata_mesi || 12)}"></div>
       <div class="field"><label for="po-pre">Preavviso disdetta (giorni)</label><input class="input" id="po-pre" inputmode="numeric" value="${esc(x.preavviso_giorni ?? 30)}"></div>
       <div class="field"><label for="po-mass">Massimale</label><input class="input" id="po-mass" value="${esc(x.massimale || "")}" placeholder="es. 500.000 €"></div>
@@ -377,6 +378,13 @@ async function apriPolizza(a, dopo = () => render()) {
       <div><button class="btn small" type="button" id="po-allega">+ Allega la polizza (PDF)</button></div></div>` : ""}
     <div class="actions">${mod ? `<button class="btn" type="button" id="po-del" style="margin-right:auto">Elimina</button>` : ""}
       <button class="btn" type="button" id="m-annulla">Annulla</button><button class="btn primary" type="button" id="po-ok">Salva polizza</button></div>`, true);
+  // decorrenza e scadenza collegate: basta conoscerne una
+  const scadDaDec = () => { if (val("po-dec")) $("po-scad").value = FinAffitti.scadenzaPolizza(val("po-dec"), val("po-dur"), $("po-tacito").checked) || ""; };
+  const decDaScad = () => { if (val("po-scad")) $("po-dec").value = FinAffitti.piuMesi(val("po-scad"), -(parseInt(val("po-dur"), 10) || 12)); };
+  $("po-dec").onchange = scadDaDec;
+  $("po-scad").onchange = decDaScad;
+  $("po-dur").addEventListener("input", scadDaDec);
+  $("po-tacito").addEventListener("change", scadDaDec);
   $("po-ok").onclick = async () => {
     const r = await conErrore(() => api.salva_assicurazione({ id: mod ? x.id : undefined, immobile: val("po-casa"), tipo: val("po-tipo"), compagnia: val("po-comp"),
       numero: val("po-num"), contraente: val("po-contr"), premio: val("po-premio"), frazionamento: val("po-fraz"), decorrenza: val("po-dec"),
