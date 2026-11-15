@@ -60,12 +60,45 @@ Uso
   - Una sola finestra alla volta: se modifichi da due finestre, la seconda
     viene bloccata per non sovrascrivere i dati.
 
+AFFITTI E CONTRATTI
+  I dati di case, inquilini, contratti, pagamenti e spese stanno nello stesso
+  archivio cifrato dei movimenti: stessa password, stesso backup, stessa
+  sincronizzazione OneDrive. Nessun dato degli inquilini resta in chiaro.
+  - Contratti -> "+ Nuovo contratto": casa, inquilini (anche nuovi), tipo
+    (4+4, 3+2, transitorio...), inizio, durata, rinnovo, preavviso, canone,
+    acconto spese, giorno di pagamento, deposito, cedolare/ISTAT.
+    L'app calcola scadenza, termine per la disdetta, da quanto l'inquilino e'
+    in casa, anniversari ISTAT e imposta di registro (riquadro "Scadenze").
+  - Affitti: una scheda per casa (pagato / in ritardo di N giorni / arretrati),
+    griglia mesi x case (verde pagato, giallo in parte, rosso in ritardo),
+    spese delle case (a carico tuo o dell'inquilino, da farsi rimborsare).
+  - Importando l'estratto conto, i bonifici degli inquilini vengono riconosciuti
+    (nome nella causale + importo) e proposti in Affitti: un clic per confermare.
+    Se il bonifico copre piu' mesi viene diviso. Se l'inquilino paga con un nome
+    diverso, scrivilo in Inquilini -> "Come compare nei bonifici".
+  - Documenti: il PDF firmato si allega al contratto. Ogni allegato e' cifrato
+    con una sua chiave (che sta nell'archivio cifrato) ed e' salvato nel browser
+    e, se collegato, su OneDrive accanto a finanze.finanze (file
+    allegato-....cifrato, illeggibili senza l'archivio). Il backup .finanze li
+    comprende.
+  - "Genera bozza" crea un .doc dal modello (Contratti -> Modello del contratto)
+    da completare in Word sul PC. Il modello e' solo una traccia da verificare.
+  - "Invia per email": sul telefono condivide il file direttamente con Gmail/
+    Outlook; sul PC lo scarica e apre la mail precompilata (allegalo a mano).
+    I file scaricati e le email NON sono cifrati: elimina i file da Download.
+  IMPORTANTE: aggiorna (ricarica) l'app su tutti i dispositivi prima di inserire
+  i contratti: una versione vecchia aperta altrove, unendo i dati, perderebbe
+  le nuove sezioni.
+
 In questa fase i dati NON si sincronizzano tra dispositivi: ognuno ha il
 suo archivio. La sincronizzazione via OneDrive e' la fase 2.
 
 File
   index.html, css\, js\   interfaccia e logica (js\core.js = core.py,
                           js\api.js = app.pyw, js\cassaforte.js = cifratura)
+  js\affitti.js           affitti e contratti (calcoli)
+  js\affitti-ui.js        affitti e contratti (schermate)
+  js\allegati.js          documenti allegati cifrati
   js\porta.js             sblocco, primo avvio, salvataggio, blocco automatico
   lib\                    SheetJS 0.20.3 (copia locale, licenza Apache 2.0)
   sw.js, manifest         installazione come app e uso senza rete

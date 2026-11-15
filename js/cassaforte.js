@@ -132,10 +132,11 @@ const archivioCancella = () => op("readwrite", (s) => s.delete(CHIAVE));
 const recordLeggi = (k) => op("readonly", (s) => s.get(k));
 const recordScrivi = (k, v) => op("readwrite", (s) => s.put(v, k));
 const recordCancella = (k) => op("readwrite", (s) => s.delete(k));
+const recordChiavi = () => op("readonly", (s) => s.getAllKeys());
 
 G.Cassaforte = {
   ITERAZIONI, PasswordErrata, FileNonValido, b64, daB64,
   nuovaSessione, cifra, apri, decifraCon, leggiIntestazione, stessaChiave, chiaveGrezza, sessioneDaGrezza,
-  archivioLeggi, archivioScrivi, archivioCancella, recordLeggi, recordScrivi, recordCancella,
+  archivioLeggi, archivioScrivi, archivioCancella, recordLeggi, recordScrivi, recordCancella, recordChiavi,
 };
 })(globalThis);

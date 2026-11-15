@@ -100,6 +100,7 @@ function sincronizza() {
     mostraStato("invio");
     try {
       await sincronizzaRecord(rec);
+      if (window.Allegati) window.Allegati.inviaInAttesa().catch(() => {});
     } catch (e) {
       if (e instanceof MS.NonCollegato) mostraStato("accesso");
       else if (e instanceof N.ErroreRete) mostraStato("offline");
@@ -189,7 +190,13 @@ function avviaControlloRemoto() {
 async function entra(oggetto, sess, rev) {
   sessione = sess; modello = oggetto; revBase = rev;
   if (!modello.impostazioni) modello.impostazioni = {};
-  if (A.migraModello(modello)) {          // archivio di una versione precedente (senza conti)
+  let daBackup = false;
+  if (modello._allegati) {                // backup ripristinato: gli allegati tornano nel loro archivio
+    if (window.Allegati) await window.Allegati.daBackup(modello._allegati);
+    delete modello._allegati;
+    daBackup = true;
+  }
+  if (A.migraModello(modello) || daBackup) {   // archivio di una versione precedente, o da ripulire
     modello.rev = (modello.rev || 0) + 1;
     await salva();
   }
@@ -275,11 +282,15 @@ async function collegaEsistente(pos) {
 
 const Porta = window.Porta = {
   blocca,
+  /* Il backup comprende anche gli allegati (contratti PDF), cifrati con le loro chiavi dentro il file cifrato. */
   async scaricaBackup() {
     await coda;
-    const testo = await K.cifra(sessione, modello);
+    const lista = (modello.allegati || []);
+    const al = lista.length && window.Allegati ? await window.Allegati.perBackup(lista) : { dati: {}, mancanti: [] };
+    const testo = await K.cifra(sessione, lista.length ? { ...modello, _allegati: al.dati } : modello);
     scaricaFile(`finanze_backup_${oggiCompatto()}.finanze`, testo, "application/octet-stream");
-    window.toast("Backup cifrato scaricato");
+    if (al.mancanti.length) window.avviso("Backup scaricato, ma incompleto", `Questi allegati non sono su questo dispositivo né raggiungibili su OneDrive, quindi non sono nel backup: <b>${al.mancanti.map(esc).join(", ")}</b>. Fai il backup dal dispositivo da cui li hai aggiunti.`);
+    else window.toast("Backup cifrato scaricato");
   },
   async info() {
     const rec = await K.archivioLeggi();
@@ -304,6 +315,7 @@ const Porta = window.Porta = {
   },
   async eliminaTutto() {
     await coda;
+    if (window.Allegati) await window.Allegati.eliminaTuttiLocali();
     await K.archivioCancella();
     await I.disattiva();
     bloccaSubito();

@@ -93,3 +93,76 @@ details summary { list-style-position: inside; }
 @media (display-mode: standalone) {
   .app { padding-top: max(16px, env(safe-area-inset-top)); }
 }
+
+/* ---------- Affitti e Contratti ---------- */
+:root { --late: #FF8F8F; --warn: #F7D08A; }
+.head .azioni { display: flex; flex-wrap: wrap; gap: 10px; }
+.modal.larga { width: min(820px, 100%); }
+.form-griglia { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.form-griglia[hidden], .check[hidden] { display: none; }
+textarea.input { width: 100%; padding: 12px 14px; min-height: 200px; resize: vertical; font-family: var(--mono); font-size: 13px; line-height: 1.5; }
+code { font-family: var(--mono); font-size: 11px; background: rgba(255,255,255,.06); padding: 1px 5px; border-radius: 6px; }
+.stato { display: inline-flex; align-items: center; min-height: 24px; padding: 0 10px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; }
+.stato.verde { color: var(--in); background: rgba(110,240,200,.10); border-color: rgba(110,240,200,.30); }
+.stato.rosso { color: var(--late); background: rgba(255,143,143,.10); border-color: rgba(255,143,143,.35); }
+.stato.giallo { color: var(--warn); background: rgba(247,208,138,.10); border-color: rgba(247,208,138,.30); }
+.stato.grigio { color: var(--muted); background: rgba(255,255,255,.05); border-color: var(--line); }
+.pannello { padding: 18px 0 14px; display: flex; flex-direction: column; gap: 10px; }
+.pannello-testa { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 0 22px; flex-wrap: wrap; }
+.pannello-testa h2 { margin: 0; font-size: 18px; }
+.tab-scroll { overflow-x: auto; }
+table.griglia { min-width: 760px; }
+table.griglia th { padding: 10px 6px; text-align: center; }
+table.griglia th:first-child { text-align: left; padding-left: 22px; }
+table.griglia td { padding: 8px 4px; }
+table.griglia tbody tr { cursor: default; }
+table.griglia tbody tr:hover td { background: transparent; }
+.g-nome { padding-left: 22px !important; min-width: 170px; position: sticky; left: 0; background: #0D0F14; z-index: 1; }
+td.g, i.g { text-align: center; font-family: var(--mono); font-weight: 700; font-style: normal; }
+td.g { height: 38px; border-radius: 8px; border: 2px solid #0D0F14; }
+td.g[data-gc] { cursor: pointer; }
+td.g[data-gc]:hover, td.g[data-gc]:focus { outline: 1px solid var(--accent); outline-offset: -2px; }
+.g.s-pagato { background: rgba(110,240,200,.16); color: var(--in); }
+.g.s-parziale { background: rgba(247,208,138,.18); color: var(--warn); }
+.g.s-ritardo { background: rgba(255,143,143,.22); color: var(--late); }
+.g.s-attesa { background: rgba(255,255,255,.05); color: var(--muted); }
+.g.s-futuro { background: rgba(255,255,255,.02); }
+.g.s-fuori { background: transparent; }
+.g-legenda { padding: 0 22px; flex-wrap: wrap; }
+.g-legenda i.g { display: inline-flex; width: 20px; height: 20px; align-items: center; justify-content: center; border-radius: 5px; font-size: 11px; margin-right: 6px; }
+table.aff { min-width: 0; }
+table.aff td, table.aff th { padding: 10px 22px; }
+.prop-riga { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr) 150px auto; gap: 10px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
+.prop-riga .input { min-height: 38px; min-width: 0; }
+.prop-mov .stato { margin-left: 6px; min-height: 20px; font-size: 11px; }
+.scadenze { display: flex; flex-direction: column; }
+.scad-riga { display: flex; gap: 14px; align-items: center; text-align: left; padding: 10px 0; border: 0; border-top: 1px solid var(--line); background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.scad-riga:first-child { border-top: 0; }
+.scad-riga:hover b { color: var(--accent); }
+.scad-riga .stato { font-family: var(--mono); min-width: 104px; justify-content: center; }
+.nuovo-inq { padding-top: 10px; border-top: 1px dashed var(--line); }
+@media (max-width: 860px) {
+  .prop-riga { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .prop-riga .prop-mov { grid-column: 1 / -1; }
+  .prop-riga > div:last-child { grid-column: 1 / -1; justify-content: flex-end; }
+}
+@media (max-width: 600px) {
+  .head .azioni { width: 100%; }
+  .head .azioni .btn { flex: 1; justify-content: center; min-height: 40px; padding: 0 12px; }
+  .modal.larga { padding: 18px; }
+  .form-griglia { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+  .form-griglia .input { font-size: 16px; }
+  table.aff td, table.aff th { padding: 8px 10px; font-size: 13px; }
+  .nasc-tel { display: none; }
+  .pannello-testa { padding: 0 14px; }
+  .g-nome { padding-left: 12px !important; min-width: 120px; }
+  .g-legenda { padding: 0 14px; }
+  .scad-riga { gap: 10px; }
+  .scad-riga .stato { min-width: 92px; }
+}
+main > .card { flex: 0 0 auto; }
+.solo-tel { display: none; }
+@media (max-width: 600px) {
+  .solo-tel { display: block; }
+  table.aff .stato { white-space: normal; min-height: 0; padding: 2px 8px; }
+}
