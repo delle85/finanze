@@ -54,6 +54,10 @@ Uso
     altrimenti l'app lo dice e si continua con la password.
   - Blocca: toglie i dati dalla memoria. Si blocca anche da sola dopo
     10 minuti di inattivita' (2/5/10/30 in Dati).
+  - Caratteri (Dati > Dimensione dei caratteri): piccoli, normali, grandi, molto
+    grandi, enormi. Vale solo per il dispositivo su cui si sceglie (anche nella
+    schermata di sblocco). Tutti i testi crescono nella stessa proporzione; con
+    caratteri molto grandi alcune schermate passano prima a una colonna.
   - Backup: file .finanze cifrato. Si ripristina dalla schermata di sblocco
     ("Ripristina un backup") con la password di quando e' stato fatto.
   - Sul telefono: menu del browser -> "Aggiungi a schermata Home".
@@ -102,6 +106,7 @@ suo archivio. La sincronizzazione via OneDrive e' la fase 2.
 File
   index.html, css\, js\   interfaccia e logica (js\core.js = core.py,
                           js\api.js = app.pyw, js\cassaforte.js = cifratura)
+  js\caratteri.js         dimensione dei caratteri (solo su questo dispositivo)
   js\affitti.js           affitti e contratti (calcoli)
   js\affitti-ui.js        affitti e contratti (schermate)
   js\immobili-ui.js       immobili, insoluti, assicurazioni, scadenze (schermate)

@@ -440,7 +440,7 @@ async function schermataSblocco(rit) {
   const serveMs = online && !MS.collegato();
   const conImpronta = await I.attivo() && await I.disponibile();
   mostra(`${riquadroMessaggio()}${MARCHIO}
-    <h2 style="font-size:24px">Sblocca</h2>
+    <h2 style="font-size:1.5rem">Sblocca</h2>
     ${conImpronta ? `<button class="btn primary" type="button" id="p-impronta" style="justify-content:center">Sblocca con impronta</button>
       <div class="note" id="p-err-imp" hidden style="color:var(--out)"></div>
       <div class="note" style="text-align:center">oppure con la password</div>` : ""}
@@ -493,7 +493,7 @@ async function schermataSblocco(rit) {
 
 async function schermataBenvenuto(rit) {
   mostra(`${riquadroMessaggio()}${MARCHIO}
-    <h2 style="font-size:24px">Benvenuto</h2>
+    <h2 style="font-size:1.5rem">Benvenuto</h2>
     <div class="note">Su questo dispositivo non ci sono ancora dati. Come vuoi iniziare?</div>
     ${rit && !rit.ok && rit.errore ? `<div class="note" style="color:var(--out)">${esc(rit.errore)}</div>` : ""}
     <button class="btn primary" type="button" id="p-online" style="justify-content:center">Apri i dati da OneDrive</button>
@@ -517,13 +517,13 @@ async function schermataBenvenuto(rit) {
 
 /* Primo avvio su un dispositivo nuovo: cerca il file nel proprio OneDrive, altrimenti chiede il link. */
 async function schermataApriOnline(msgErrore = "") {
-  mostra(`${MARCHIO}<h2 style="font-size:24px">Apri da OneDrive</h2><div class="note">Cerco il file nel tuo OneDrive…</div>`);
+  mostra(`${MARCHIO}<h2 style="font-size:1.5rem">Apri da OneDrive</h2><div class="note">Cerco il file nel tuo OneDrive…</div>`);
   let pos = null;
   try { if (!msgErrore) pos = await N.trovaMio(); }
   catch (e) { if (e instanceof MS.NonCollegato) return MS.accedi({ dopo: "apri-onedrive" }); msgErrore = e.message; }
   if (pos) return schermataPasswordOnline(pos);
   const u = MS.utente();
-  mostra(`${MARCHIO}<h2 style="font-size:24px">Apri da OneDrive</h2>
+  mostra(`${MARCHIO}<h2 style="font-size:1.5rem">Apri da OneDrive</h2>
     <div class="note">${u ? `Collegato come <b>${esc(u.email)}</b>. ` : ""}Nel tuo OneDrive non c'è il file <b>${N.CARTELLA}/${N.NOME_FILE}</b>.
       Se qualcuno lo ha condiviso con te, incolla qui il link che hai ricevuto (dall'email di OneDrive: «Apri»/«Visualizza», poi copia l'indirizzo).</div>
     <form id="p-form" class="field" style="gap:10px">
@@ -550,11 +550,11 @@ async function schermataApriOnline(msgErrore = "") {
 }
 
 async function schermataPasswordOnline(pos) {
-  mostra(`${MARCHIO}<h2 style="font-size:24px">Apri da OneDrive</h2><div class="note">Scarico il file cifrato…</div>`);
+  mostra(`${MARCHIO}<h2 style="font-size:1.5rem">Apri da OneDrive</h2><div class="note">Scarico il file cifrato…</div>`);
   let testo, eTag;
   try { ({ testo, eTag } = await N.scarica(pos)); K.leggiIntestazione(testo); }
   catch (e) { return schermataApriOnline(e.message || String(e)); }
-  mostra(`${MARCHIO}<h2 style="font-size:24px">Password dei dati</h2>
+  mostra(`${MARCHIO}<h2 style="font-size:1.5rem">Password dei dati</h2>
     <div class="note">Trovato <b>${esc(pos.nome)}</b> su OneDrive. Inserisci la password con cui è protetto (la stessa usata sugli altri dispositivi).</div>
     <form id="p-form" class="field" style="gap:10px">
       <input type="text" name="username" value="Finanze personali" autocomplete="username" hidden>
@@ -586,7 +586,7 @@ async function schermataPasswordOnline(pos) {
 
 function schermataNuovaPassword(m, intro, fileJson) {
   mostra(`
-    <h2 style="font-size:24px">Scegli la password</h2>
+    <h2 style="font-size:1.5rem">Scegli la password</h2>
     <div class="note">${intro}</div>
     <form id="p-form" class="field" style="gap:10px">
       <input type="text" name="username" value="Finanze personali" autocomplete="username" hidden>
@@ -627,7 +627,7 @@ async function schermataRipristino(sostituisce) {
   const testo = await f.text();
   try { K.leggiIntestazione(testo); } catch (e) { window.alert(e.message || String(e)); return; }
   mostra(`
-    <h2 style="font-size:24px">Ripristina backup</h2>
+    <h2 style="font-size:1.5rem">Ripristina backup</h2>
     <div class="note">File: <b>${esc(f.name)}</b>. Inserisci la password usata quando è stato fatto il backup.</div>
     ${sostituisce ? `<div class="box" style="border-color:rgba(255,176,138,.45)"><b>Attenzione</b><div class="note">I dati attuali su questo dispositivo verranno <b>sostituiti</b> da quelli del backup
       (e, se il dispositivo è collegato a OneDrive, il backup verrà unito ai dati online alla prossima sincronizzazione).</div></div>` : ""}

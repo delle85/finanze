@@ -41,7 +41,7 @@ function casaCard(c) {
         ${riga("In casa", personeTesto(k), k.n_minori ? "color:var(--warn)" : "")}
         ${riga(k.scaduto ? "Contratto scaduto il" : "Scadenza contratto", k.scadenza ? dataIt(k.scadenza) : "—", k.scaduto ? "color:var(--late)" : c.in_scadenza ? "color:var(--warn)" : "")}
       </div>`
-    : `<div class="cc-main"><div><div class="sub">Sfitta</div><div class="v" style="font-size:20px">${c.giorni_sfitta !== null ? `da ${c.giorni_sfitta} giorni` : "mai affittata"}</div></div></div>
+    : `<div class="cc-main"><div><div class="sub">Sfitta</div><div class="v" style="font-size:1.25rem">${c.giorni_sfitta !== null ? `da ${c.giorni_sfitta} giorni` : "mai affittata"}</div></div></div>
       <div class="conto-righe">
         ${c.sfitta_dal ? riga("Libera dal", dataIt(c.sfitta_dal)) : ""}
         ${riga("Canone richiesto", c.canone_richiesto ? `<span class="num">${euro(c.canone_richiesto)}</span>` : `<span class="note">—</span>`)}
@@ -61,7 +61,7 @@ async function renderImmobili() {
   if (!r.n) {
     main.innerHTML = `<div class="head"><div><div class="sub">Le tue case, affittate e sfitte</div><h1>Immobili</h1></div></div>
       <div class="card glass" style="max-width:640px"><h2>Aggiungi le tue case</h2>
-        <div class="note" style="font-size:14px;color:var(--text)">Ogni casa diventa una scheda: vedi subito se è affittata o sfitta, chi ci vive, quanto rende,
+        <div class="note" style="font-size:0.875rem;color:var(--text)">Ogni casa diventa una scheda: vedi subito se è affittata o sfitta, chi ci vive, quanto rende,
           le spese, l'assicurazione e i documenti (APE, planimetria, visura). Puoi aggiungere anche case sfitte.</div>
         <div><button class="btn primary" type="button" id="im-prima">+ Aggiungi la prima casa</button></div></div>`;
     $("im-prima").onclick = () => apriCasa({}, (id) => { S.imm.dett = id; render(); });
@@ -157,7 +157,7 @@ async function renderImmobileDettaglio() {
             ${riga(k.scaduto ? "Scaduto il" : "Scadenza", k.scadenza ? dataIt(k.scadenza) : "—", k.scaduto ? "color:var(--late)" : "")}
             ${k.disdetta_entro && !k.scaduto ? riga("Disdetta entro", dataIt(k.disdetta_entro)) : ""}</div>
           <div><button class="btn small" type="button" id="id-pagamenti">Pagamenti mese per mese</button></div>`
-        : `<h2>La casa è sfitta</h2><div class="note" style="font-size:14px;color:var(--text)">${d.giorni_sfitta !== null ? `Libera dal ${dataIt(d.sfitta_dal)} (${d.giorni_sfitta} giorni).` : "Non è mai stata affittata."}
+        : `<h2>La casa è sfitta</h2><div class="note" style="font-size:0.875rem;color:var(--text)">${d.giorni_sfitta !== null ? `Libera dal ${dataIt(d.sfitta_dal)} (${d.giorni_sfitta} giorni).` : "Non è mai stata affittata."}
             ${d.canone_richiesto ? ` Canone richiesto: <b>${euro(d.canone_richiesto)}</b>.` : ""}</div>
           <div><button class="btn primary" type="button" id="id-nuovo-c">+ Crea il contratto</button></div>`}</section>
       <section class="card glass"><h2>Prossime scadenze</h2>${listaEventi(d.eventi, false)}</section>
@@ -237,7 +237,7 @@ async function renderInsoluti() {
   const testa = `<div class="head"><div><div class="sub">Contratti non saldati fino in fondo, dal più grave</div><h1>Insoluti</h1></div></div>`;
   if (!r.elenco.length) {
     main.innerHTML = `${testa}<div class="card glass tutto-ok"><div class="ok-icona" aria-hidden="true">✓</div><div><h2>Tutto incassato</h2>
-      <div class="note" style="font-size:14px">Nessun contratto ha rate scadute non pagate (anche in parte) né spese da farsi rimborsare.</div></div></div>`;
+      <div class="note" style="font-size:0.875rem">Nessun contratto ha rate scadute non pagate (anche in parte) né spese da farsi rimborsare.</div></div></div>`;
     return;
   }
   main.innerHTML = `${testa}
@@ -473,7 +473,7 @@ async function apriPromemoria(id, data) {
   }
   const mod = Boolean(p.id);
   apriModal(`${testaModal(mod ? p.titolo : "Nuovo promemoria", mod && p.ripeti !== "no" ? `Ricorrente · scadenza del ${dataIt(p.occorrenza)}` : "")}
-    ${mod ? `<label class="check" style="font-size:15px"><input type="checkbox" id="pr-fatto" ${p.fatto ? "checked" : ""}> Fatto${p.ripeti !== "no" ? ` (scadenza del ${dataIt(p.occorrenza)})` : ""}</label>` : ""}
+    ${mod ? `<label class="check" style="font-size:0.9375rem"><input type="checkbox" id="pr-fatto" ${p.fatto ? "checked" : ""}> Fatto${p.ripeti !== "no" ? ` (scadenza del ${dataIt(p.occorrenza)})` : ""}</label>` : ""}
     <div class="field"><label for="pr-tit">Cosa</label><input class="input" id="pr-tit" value="${esc(p.titolo || "")}" placeholder="es. Lettura contatori, Revisione caldaia, Rata IMU, Conguaglio spese"></div>
     <div class="form-griglia">
       ${mod ? "" : `<div class="field"><label for="pr-data">Data</label><input class="input" id="pr-data" type="date" value="${esc(p.data)}"></div>`}

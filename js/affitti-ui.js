@@ -25,7 +25,7 @@ function apriModal(html, larga = false) {
   if ($("m-annulla")) $("m-annulla").onclick = chiudiModal;
 }
 const testaModal = (titolo, sotto = "") => `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
-  <div><h2 id="m-title" style="font-size:22px">${esc(titolo)}</h2>${sotto ? `<div class="note" style="margin-top:4px">${sotto}</div>` : ""}</div>
+  <div><h2 id="m-title" style="font-size:1.375rem">${esc(titolo)}</h2>${sotto ? `<div class="note" style="margin-top:4px">${sotto}</div>` : ""}</div>
   <button class="icon-btn" type="button" id="m-close" aria-label="Chiudi">${ICONA_X}</button></div>`;
 
 async function conErrore(fn) {
@@ -140,7 +140,7 @@ async function renderAffitti() {
     main.innerHTML = `<div class="head"><div><div class="sub">Chi ha pagato, chi è in ritardo, spese delle case</div><h1>Affitti</h1></div></div>
       <div class="card glass" style="max-width:640px">
         <h2>Iniziamo</h2>
-        <div class="note" style="font-size:14px;color:var(--text)">Per seguire gli affitti serve un <b>contratto</b>: casa, inquilino, canone e giorno di pagamento.
+        <div class="note" style="font-size:0.875rem;color:var(--text)">Per seguire gli affitti serve un <b>contratto</b>: casa, inquilino, canone e giorno di pagamento.
           Lo crei in un'unica schermata. Poi, quando importi l'estratto conto, l'app riconosce da sola i bonifici degli inquilini e ti chiede solo di confermarli.</div>
         <div class="note">Tutto resta nell'archivio cifrato con la tua password, come i movimenti.</div>
         <div><button class="btn primary" type="button" id="a-primo">+ Aggiungi il primo contratto</button></div>
@@ -160,7 +160,7 @@ async function renderAffitti() {
     <div class="kpis">
       <div class="kpi glass"><div class="sub">Incassato ${esc(r.anno)}</div><div class="v" style="color:var(--in)">${euro(r.incassato)}</div><div class="note">su ${euro(r.atteso)} previsti nell'anno</div></div>
       <div class="kpi glass"><div class="sub">Arretrati</div><div class="v" style="color:${r.arretrati ? "var(--late)" : "var(--text)"}">${euro(r.arretrati)}</div><div class="note">rate scadute non pagate</div></div>
-      <div class="kpi glass"><div class="sub">In ritardo</div><div class="v" style="color:${r.in_ritardo ? "var(--late)" : "var(--text)"}">${r.in_ritardo} <span class="note" style="font-size:14px">su ${r.n_contratti}</span></div><div class="note">contratti con arretrati</div></div>
+      <div class="kpi glass"><div class="sub">In ritardo</div><div class="v" style="color:${r.in_ritardo ? "var(--late)" : "var(--text)"}">${r.in_ritardo} <span class="note" style="font-size:0.875rem">su ${r.n_contratti}</span></div><div class="note">contratti con arretrati</div></div>
       <div class="kpi glass"><div class="sub">Spese ${esc(r.anno)}</div><div class="v" style="color:var(--out)">${euro(r.spese)}</div><div class="note">a tuo carico${r.spese_inquilini ? ` · ${euro(r.spese_inquilini)} da farti rimborsare` : ""}</div></div>
     </div>
     ${proposte.length ? `<section class="card glass" style="border-color:rgba(110,240,200,.35)">
@@ -216,7 +216,7 @@ async function renderAffittoDettaglio() {
       <div class="kpi glass"><div class="sub">Totale al mese</div><div class="v">${euro(s.dovuto)}</div><div class="note">entro il giorno ${s.giorno_pagamento}${s.spese_mensili || s.quota_amministrazione ? ` · ${totaleTesto(s)}` : ""}</div></div>
       <div class="kpi glass"><div class="sub">Arretrati</div><div class="v" style="color:${s.arretrati ? "var(--late)" : "var(--in)"}">${euro(s.arretrati)}</div><div class="note">${s.arretrati ? `${s.mesi_arretrati} ${s.mesi_arretrati === 1 ? "mese" : "mesi"}, fino a ${s.max_giorni_ritardo} giorni` : "tutto in regola"}</div></div>
       <div class="kpi glass"><div class="sub">Incassato in totale</div><div class="v" style="color:var(--in)">${euro(d.incassato_totale)}</div><div class="note">dal ${dataIt(s.inizio)}</div></div>
-      <div class="kpi glass"><div class="sub">In casa da</div><div class="v" style="font-size:20px">${esc(s.in_casa_da || "—")}</div><div class="note">dal ${dataIt(s.in_casa_dal)}</div></div>
+      <div class="kpi glass"><div class="sub">In casa da</div><div class="v" style="font-size:1.25rem">${esc(s.in_casa_da || "—")}</div><div class="note">dal ${dataIt(s.in_casa_dal)}</div></div>
     </div>
     <section class="panel glass pannello"><div class="pannello-testa"><h2>Mese per mese</h2></div>
       <table class="aff"><thead><tr><th>Mese</th><th style="text-align:right">Dovuto</th><th style="text-align:right">Pagato</th><th>Stato</th></tr></thead>
@@ -436,7 +436,7 @@ async function apriContratto(id) {
   collegaAllegati($("modal"), () => apriContratto(id));
   $("ct-del").onclick = () => {
     apriModal(`${testaModal("Eliminare il contratto?")}
-      <div class="note" style="font-size:14px;color:var(--text)">Vengono eliminati il contratto, <b>tutti i suoi pagamenti registrati</b> e i documenti allegati.
+      <div class="note" style="font-size:0.875rem;color:var(--text)">Vengono eliminati il contratto, <b>tutti i suoi pagamenti registrati</b> e i documenti allegati.
         Se il contratto è solo finito, usa invece <b>Modifica → Chiuso il</b>: lo storico resta e la casa risulta sfitta.</div>
       <div class="field"><label for="ct-conf">Scrivi ELIMINA per confermare</label><input class="input" id="ct-conf" autocomplete="off"></div>
       <div class="actions"><button class="btn" type="button" id="m-annulla">Annulla</button><button class="btn primary" type="button" id="ct-conf-ok">Elimina</button></div>`);

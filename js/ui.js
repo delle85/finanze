@@ -150,7 +150,7 @@ function apriCategoria(id) {
   const cats = S.stato.categorie;
   const modal = $("modal");
   modal.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center"><h2 id="m-title" style="font-size:22px">Assegna categoria</h2>
+    <div style="display:flex;justify-content:space-between;align-items:center"><h2 id="m-title" style="font-size:1.375rem">Assegna categoria</h2>
       <button class="icon-btn" type="button" id="m-close" aria-label="Chiudi"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
     <div class="mov-box"><div><div style="font-weight:500">${esc(m.descrizione)}</div><div class="date" style="margin-top:4px">${dataIt(m.data)}</div></div>
       <div class="num" style="color:${m.importo < 0 ? "var(--out)" : "var(--in)"}">${euro(m.importo, true)}</div></div>
@@ -204,7 +204,7 @@ function chiediCarta(nomeFile) {
   return new Promise((ok) => {
     const modal = $("modal");
     modal.innerHTML = `
-      <h2 id="m-title" style="font-size:22px">Di quale carta è questo estratto?</h2>
+      <h2 id="m-title" style="font-size:1.375rem">Di quale carta è questo estratto?</h2>
       <div class="note">Il file <b>${esc(nomeFile)}</b> sembra l'estratto di una carta prepagata, ma non riporta il numero.
         Scrivi le <b>ultime 4 cifre</b> della carta: servono per tenerne separati i movimenti e abbinare le ricariche dal conto.</div>
       <div class="field"><label for="m-carta">Ultime 4 cifre</label><input class="input" id="m-carta" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="es. 1234"></div>
@@ -232,7 +232,7 @@ async function importaFile(files) {
   const prop = r.nuovi && api.affitti_proposte ? (await api.affitti_proposte()).length : 0;
   const perFile = r.dettagli.length > 1 || r.dettagli.some((d) => d.conto !== "Conto BNL");
   modal.innerHTML = `
-    <h2 id="m-title" style="font-size:22px">Importazione completata</h2>
+    <h2 id="m-title" style="font-size:1.375rem">Importazione completata</h2>
     <div class="kpis" style="grid-template-columns:repeat(2,minmax(0,1fr))">
       <div class="kpi glass"><div class="sub">Movimenti nuovi</div><div class="v" style="color:var(--in)">${r.nuovi}</div></div>
       <div class="kpi glass"><div class="sub">Già presenti</div><div class="v">${r.doppi}</div></div>
@@ -446,7 +446,7 @@ async function renderRiepilogo() {
           const prev = confCat ? (confCat.categorie[x.categoria] || 0) : null;
           return `<button type="button" class="cat-row" data-cat="${esc(x.categoria)}">
             <div class="row" style="width:100%"><span>${esc(x.categoria)} <span class="note">· ${x.n}</span></span>
-              <span class="date" style="font-size:12px">${euro(x.totale)} · ${(Math.abs(x.totale) / totUsc * 100).toFixed(1).replace(".", ",")}%</span></div>
+              <span class="date" style="font-size:0.75rem">${euro(x.totale)} · ${(Math.abs(x.totale) / totUsc * 100).toFixed(1).replace(".", ",")}%</span></div>
             <div class="bar" style="width:100%"><div style="width:${(Math.abs(x.totale) / maxCat * 100).toFixed(1)}%;${x.categoria === NON_CAT ? "background:#5C616C;box-shadow:none" : ""}"></div></div>
             ${prev !== null ? `<div class="delta" style="margin-top:0">${deltaRiga(-x.totale, -prev, confCat, -1)}</div>` : ""}
           </button>`; }).join("") : `<div class="empty">Nessuna uscita in questo periodo.</div>`}
@@ -455,13 +455,13 @@ async function renderRiepilogo() {
       <section class="card glass">
         <div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px"><h2>Andamento per ${GRP_SING[r.grp]}</h2>${legenda}</div>
         ${grafico(r.serie, true)}
-        <div style="overflow-x:auto"><table class="andamento" style="min-width:0;font-size:13px">
+        <div style="overflow-x:auto"><table class="andamento" style="min-width:0;font-size:0.8125rem">
           <thead><tr><th style="padding:8px 0">Periodo</th><th style="padding:8px 0;text-align:right">Entrate</th><th style="padding:8px 0;text-align:right">Uscite</th><th style="padding:8px 0;text-align:right">Risparmio</th><th style="padding:8px 0;text-align:right">Tasso</th></tr></thead>
           <tbody>${r.serie.slice().reverse().map((s) => `<tr class="zoom-row" data-k="${s.periodo}"><td style="padding:9px 0">${etichetta(s.periodo, true)}</td>
-            <td class="num" style="padding:9px 0;color:var(--in);font-size:12px">${euro(s.entrate, true)}</td>
-            <td class="num" style="padding:9px 0;color:var(--out);font-size:12px">${euro(s.uscite, true)}</td>
-            <td class="num" style="padding:9px 0;font-size:12px">${euro(s.entrate + s.uscite, true)}</td>
-            <td class="num" style="padding:9px 0;font-size:12px;color:var(--muted)">${s.entrate > 0 ? pct((s.entrate + s.uscite) / s.entrate) : "—"}</td></tr>`).join("")}</tbody></table></div>
+            <td class="num" style="padding:9px 0;color:var(--in);font-size:0.75rem">${euro(s.entrate, true)}</td>
+            <td class="num" style="padding:9px 0;color:var(--out);font-size:0.75rem">${euro(s.uscite, true)}</td>
+            <td class="num" style="padding:9px 0;font-size:0.75rem">${euro(s.entrate + s.uscite, true)}</td>
+            <td class="num" style="padding:9px 0;font-size:0.75rem;color:var(--muted)">${s.entrate > 0 ? pct((s.entrate + s.uscite) / s.entrate) : "—"}</td></tr>`).join("")}</tbody></table></div>
       </section>
       ${tabellaCategorie(r)}
     </div>`;
@@ -590,7 +590,7 @@ async function renderDettaglio() {
         ${r.esercenti.length ? r.esercenti.map((e) => `
           <button type="button" class="cat-row ${e.nome === S.dettEs ? "on" : ""}" data-es="${esc(e.nome)}">
             <div class="row" style="width:100%"><span>${esc(e.nome)} <span class="note">· ${e.n}</span></span>
-              <span class="date" style="font-size:12px">${euro(e.totale)}</span></div>
+              <span class="date" style="font-size:0.75rem">${euro(e.totale)}</span></div>
             <div class="bar" style="width:100%"><div style="width:${(Math.abs(e.totale) / maxEs * 100).toFixed(1)}%"></div></div>
           </button>`).join("") : `<div class="empty">Nessun movimento in questo periodo.</div>`}
         </div>
@@ -708,13 +708,30 @@ function collegaCardOneDrive() {
   };
 }
 
+/* Dimensione dei caratteri: solo per questo dispositivo (js/caratteri.js). */
+function cardCaratteri() {
+  const C = window.Caratteri, ora = C.valore();
+  return `
+      <section class="card glass">
+        <h2>Dimensione dei caratteri</h2>
+        <div class="note">Ingrandisce tutti i testi nella stessa proporzione. Vale solo per <b>questo dispositivo</b>:
+          sul telefono e sul PC puoi scegliere dimensioni diverse.</div>
+        <div class="car-scelte" role="group" aria-label="Dimensione dei caratteri">${C.SCELTE.map((s) => `
+          <button type="button" data-car="${s.p}" class="${s.p === ora ? "on" : ""}" aria-pressed="${s.p === ora}">
+            <span class="car-a" style="font-size:${Math.round(20 * s.p / 100)}px" aria-hidden="true">A</span><span class="car-nome">${s.nome}</span></button>`).join("")}</div>
+        <div class="car-esempio" aria-hidden="true"><span class="sub">Esempio · Saldo del mese</span><span class="v">1.234,56 €</span>
+          <span class="note">Le note e le date restano più piccole dei titoli, come sempre.</span></div>
+      </section>`;
+}
+
 async function renderDati() {
   const P = window.Porta, info = await P.info();
   const quando = info.salvato_il ? new Date(info.salvato_il).toLocaleString("it-IT") : "—";
   const imp = await P.impronta();
   $("main").innerHTML = `
-    <div class="head"><div><div class="sub">Archivio cifrato, OneDrive, backup, password</div><h1>Dati</h1></div></div>
+    <div class="head"><div><div class="sub">Archivio cifrato, OneDrive, backup, password, caratteri</div><h1>Dati</h1></div></div>
     <div class="cards">
+      ${cardCaratteri()}
       ${cardOneDrive(info)}
       <section class="card glass">
         <h2>Sblocco con impronta</h2>
@@ -765,6 +782,12 @@ async function renderDati() {
       </section>
     </div>`;
   collegaCardOneDrive();
+  $("main").querySelectorAll("[data-car]").forEach((b) => b.onclick = () => {
+    window.Caratteri.imposta(+b.dataset.car);
+    const scelta = window.Caratteri.SCELTE.find((s) => s.p === +b.dataset.car);
+    render().then(() => { const x = $("main").querySelector(`[data-car="${b.dataset.car}"]`); if (x) x.focus(); });
+    toast(`Caratteri: ${scelta.nome.toLowerCase()}`);
+  });
   if ($("d-imp-on")) $("d-imp-on").onclick = async () => {
     const pw = await window.chiediPassword("Attiva lo sblocco con impronta", "Inserisci la password dei dati, poi conferma con l'impronta quando il telefono la chiede.");
     if (pw === null) return;
@@ -802,7 +825,7 @@ window.avviaInterfaccia = avviaInterfaccia;
 
 /* Finestra di avviso semplice (html già sicuro). */
 window.avviso = (titolo, html) => {
-  $("modal").innerHTML = `<h2 id="m-title" style="font-size:22px">${esc(titolo)}</h2><div class="note" style="font-size:14px;color:var(--text)">${html}</div>
+  $("modal").innerHTML = `<h2 id="m-title" style="font-size:1.375rem">${esc(titolo)}</h2><div class="note" style="font-size:0.875rem;color:var(--text)">${html}</div>
     <div class="actions"><button class="btn primary" type="button" id="m-ok">Ok</button></div>`;
   $("modal").setAttribute("aria-labelledby", "m-title");
   $("modal-bg").classList.add("open");
@@ -824,7 +847,7 @@ window.statoSyncCambiato = () => {
 
 /* Chiede una password in una finestra. -> Promise<string | null> */
 window.chiediPassword = (titolo, testo) => new Promise((ok) => {
-  $("modal").innerHTML = `<h2 id="m-title" style="font-size:22px">${esc(titolo)}</h2><div class="note">${esc(testo)}</div>
+  $("modal").innerHTML = `<h2 id="m-title" style="font-size:1.375rem">${esc(titolo)}</h2><div class="note">${esc(testo)}</div>
     <form id="m-form" class="field">
       <input type="text" name="username" value="Finanze personali" autocomplete="username" hidden>
       <label for="m-pw">Password</label><input class="input" id="m-pw" type="password" autocomplete="current-password">

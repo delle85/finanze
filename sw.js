@@ -1,10 +1,10 @@
 /* Service worker: rende l'app installabile e utilizzabile anche senza rete.
    Mette in cache SOLO i file dell'app (mai i dati, che stanno cifrati in IndexedDB).
    Ad ogni modifica dei file aumentare VERSIONE. */
-const VERSIONE = "finanze-v11";
+const VERSIONE = "finanze-v12";
 const FILE = [
   "./", "index.html", "manifest.webmanifest", "css/stile.css", "css/web.css",
-  "lib/xlsx.full.min.js", "js/core.js", "js/affitti.js", "js/api.js", "js/allegati.js", "js/affitti-ui.js", "js/immobili-ui.js", "js/cassaforte.js", "js/impronta.js", "js/unione.js",
+  "lib/xlsx.full.min.js", "js/core.js", "js/caratteri.js", "js/affitti.js", "js/api.js", "js/allegati.js", "js/affitti-ui.js", "js/immobili-ui.js", "js/cassaforte.js", "js/impronta.js", "js/unione.js",
   "js/microsoft.js", "js/nuvola.js", "js/ui.js", "js/porta.js",
   "icone/icona-64.png", "icone/icona-256.png",
 ];
