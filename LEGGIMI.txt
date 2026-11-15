@@ -60,12 +60,52 @@ Uso
   - Una sola finestra alla volta: se modifichi da due finestre, la seconda
     viene bloccata per non sovrascrivere i dati.
 
+AFFITTI E CONTRATTI (case, inquilini, insoluti, assicurazioni, scadenze)
+  Tutto sta nello stesso archivio cifrato dei movimenti: stessa password, stesso
+  backup, stessa sincronizzazione OneDrive. Nessun dato degli inquilini in chiaro.
+  - Immobili: una scheda per casa (affittata / sfitta / da incassare / contratto in
+    scadenza) con totale mensile, titolare, persone in casa e minorenni, polizza,
+    netto dell'anno. Si aggiungono anche case sfitte. Clic sulla scheda: pagina
+    della casa con contratti, spese, assicurazioni, documenti (APE, planimetria,
+    visura) e dati catastali.
+  - Insoluti (in rosso nel menu): i contratti non saldati fino in fondo, dal piu'
+    grave (critico: oltre 60 giorni, 3 rate o contratto chiuso con debiti; grave:
+    oltre 20 giorni o 2 rate). Mesi scoperti, pagamenti parziali, spese da farsi
+    rimborsare, sollecito pronto da mandare per email o WhatsApp. Quando c'e' un
+    insoluto compare un avviso rosso in cima alle sezioni delle case.
+  - Contratti -> "+ Nuovo contratto": casa, titolare del contratto, altre persone
+    che vivono in casa (con "minorenne" o data di nascita), tipo e regime fiscale
+    (cedolare secca / ordinario), canone + acconto spese + quota amministrazione =
+    totale mensile. "Tipi di contratto": crea i tuoi tipi (durata, rinnovo,
+    preavviso, regime, ISTAT); si possono creare anche dal menu "Tipo" del contratto.
+  - Affitti: incassi mese per mese (verde pagato, giallo in parte, rosso in ritardo).
+    Importando l'estratto conto i bonifici degli inquilini vengono riconosciuti e
+    proposti: un clic per confermare.
+  - Assicurazioni: polizze per casa (compagnia, numero, premio e rate, decorrenza,
+    tacito rinnovo, preavviso di disdetta, massimale) con avviso prima della
+    scadenza e PDF della polizza cifrato.
+  - Scadenze: calendario del mese e scadenziario dei prossimi 90 giorni con rate
+    d'affitto, fine contratti, disdette, registro, ISTAT, polizze e premi, e i tuoi
+    promemoria (anche ogni mese / ogni anno, da spuntare quando fatti).
+  - Documenti: ogni allegato e' cifrato con una sua chiave ed e' salvato nel browser
+    e su OneDrive (file allegato-....cifrato). Il backup .finanze li comprende.
+  - "Genera bozza" crea un .doc dal modello da completare in Word sul PC (il modello
+    e' solo una traccia da verificare). "Invia per email" e i solleciti NON sono
+    cifrati: elimina i file da Download.
+  IMPORTANTE: aggiorna (ricarica) l'app su tutti i dispositivi prima di inserire
+  i contratti: una versione vecchia aperta altrove, unendo i dati, perderebbe
+  le nuove sezioni.
+
 In questa fase i dati NON si sincronizzano tra dispositivi: ognuno ha il
 suo archivio. La sincronizzazione via OneDrive e' la fase 2.
 
 File
   index.html, css\, js\   interfaccia e logica (js\core.js = core.py,
                           js\api.js = app.pyw, js\cassaforte.js = cifratura)
+  js\affitti.js           affitti e contratti (calcoli)
+  js\affitti-ui.js        affitti e contratti (schermate)
+  js\immobili-ui.js       immobili, insoluti, assicurazioni, scadenze (schermate)
+  js\allegati.js          documenti allegati cifrati
   js\porta.js             sblocco, primo avvio, salvataggio, blocco automatico
   lib\                    SheetJS 0.20.3 (copia locale, licenza Apache 2.0)
   sw.js, manifest         installazione come app e uso senza rete

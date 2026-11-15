@@ -10,7 +10,7 @@ const oraIso = () => { const d = new Date(), p = (n) => String(n).padStart(2, "0
 const vuota = (c) => c === null || c === undefined;
 
 const CONTO_BNL = () => ({ id: C.CONTO_BASE, nome: "Conto BNL", tipo: "conto", numero: null });
-const VERSIONE_MODELLO = 2;
+const VERSIONE_MODELLO = 3;
 
 /* Modello vuoto: come un database nuovo (con le regole di base). */
 function modelloVuoto() {
@@ -18,6 +18,7 @@ function modelloVuoto() {
     formato: "finanze-dati", versione: VERSIONE_MODELLO, rev: 0, conti: [CONTO_BNL()],
     movimenti: [], regole: C.REGOLE_BASE.map(([p, c], i) => ({ id: i + 1, parola: p, categoria: c })),
     impostazioni: {},
+    immobili: [], inquilini: [], contratti: [], pagamenti: [], spese: [], allegati: [], scarti: [],
   };
 }
 
@@ -62,6 +63,8 @@ function migraModello(M) {
     }
     M.versione = 2; cambiato = true;
   }
+  if (G.FinAffitti && G.FinAffitti.migra(M)) cambiato = true;          // versione 3: affitti e contratti
+  if ((M.versione || 1) < 3) { M.versione = 3; cambiato = true; }
   return cambiato;
 }
 
@@ -149,7 +152,7 @@ function creaApi(M, salva) {
 
   function serieVuota(colonne) { return colonne.map((k) => ({ periodo: k, entrate: 0.0, uscite: 0.0 })); }
 
-  return {
+  const api = {
     NON_CAT,
 
     async stato() {
@@ -356,6 +359,8 @@ function creaApi(M, salva) {
 
     async conti() { return M.conti.map((c) => ({ id: c.id, nome: c.nome, tipo: c.tipo })); },
   };
+  if (G.FinAffitti) Object.assign(api, G.FinAffitti.creaAffitti(M, modificato));
+  return api;
 
   function assicuraCarta(numero, contiNuovi) {
     const c = C.contoCarta(numero);

@@ -99,12 +99,34 @@ function unisci(base, nostro, loro, preferisci = "nostro") {
   const impostazioni = {};
   for (const [k, x] of impMap) impostazioni[k] = x.v;
 
-  return {
+  const out = {
     formato: "finanze-dati",
     versione: Math.max(nostro.versione || 1, loro.versione || 1),
     rev: Math.max(nostro.rev || 0, loro.rev || 0) + 1,
     conti, movimenti, regole, impostazioni,
   };
+
+  // --- tutte le altre liste (affitti, contratti, … e quelle di versioni future): voci identificate dall'id ---
+  const gestite = new Set(Object.keys(out));
+  const altre = new Set();
+  for (const M of [nostro, loro]) for (const k of Object.keys(M || {})) if (!gestite.has(k) && Array.isArray(M[k])) altre.add(k);
+  for (const k of altre) out[k] = unisciLista(base, nostro, loro, k, vn);
+  return out;
+}
+
+/* Lista di oggetti con "id": unione voce per voce, campo per campo. Ordine: quello di OneDrive, poi le nuove nostre. */
+function unisciLista(base, nostro, loro, nome, vinceNostro) {
+  const mappa = (M) => new Map(((M && Array.isArray(M[nome])) ? M[nome] : []).filter((x) => x && x.id !== undefined).map((x) => [x.id, x]));
+  const mb = mappa(base), mo = mappa(nostro), mt = mappa(loro);
+  const campi = new Set();
+  for (const m of [mb, mo, mt]) for (const x of m.values()) for (const k of Object.keys(x)) campi.add(k);
+  const r = unisciMappe(mb, mo, mt, [...campi], vinceNostro);
+  const ordine = [...mt.keys(), ...mo.keys()].filter((k, i, a) => r.has(k) && a.indexOf(k) === i);
+  return ordine.map((k) => {
+    const v = r.get(k), x = {};
+    for (const [c, val] of Object.entries(v)) if (val !== undefined) x[c] = val;
+    return x;
+  });
 }
 
 G.Unione = { unisci };

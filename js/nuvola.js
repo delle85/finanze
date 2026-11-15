@@ -114,5 +114,34 @@ async function daLink(link) {
   return posizioneDa(it);
 }
 
-G.Nuvola = { Conflitto, NonTrovato, ErroreRete, CARTELLA, NOME_FILE, meta, scarica, carica, crea, trovaMio, daLink };
+/* ---- File accanto a finanze.finanze (allegati cifrati), nella stessa cartella ---- */
+async function cartella(pos) {
+  const it = await leggiItem(pos);
+  return { driveId: it.parentReference.driveId, id: it.parentReference.id };
+}
+const percorsoAccanto = (c, nome) => `/drives/${encodeURIComponent(c.driveId)}/items/${encodeURIComponent(c.id)}:/${encodeURIComponent(nome)}`;
+
+async function caricaAccanto(pos, nome, testo) {
+  const c = await cartella(pos);
+  await graph(percorsoAccanto(c, nome) + ":/content", { metodo: "PUT", corpo: testo, intestazioni: { "Content-Type": "text/plain" } });
+}
+
+async function scaricaAccanto(pos, nome) {
+  const c = await cartella(pos);
+  const it = await graph(percorsoAccanto(c, nome));
+  const url = it["@microsoft.graph.downloadUrl"];
+  if (!url || !/^https:\/\//i.test(url)) throw new Error("OneDrive non ha dato l'indirizzo per scaricare l'allegato.");
+  let r;
+  try { r = await fetch(url, { cache: "no-store", credentials: "omit" }); } catch (e) { throw new ErroreRete("Download da OneDrive non riuscito."); }
+  if (!r.ok) throw new Error(`Download da OneDrive: errore ${r.status}`);
+  return r.text();
+}
+
+async function eliminaAccanto(pos, nome) {
+  const c = await cartella(pos);
+  try { await graph(percorsoAccanto(c, nome), { metodo: "DELETE" }); } catch (e) { if (!(e instanceof NonTrovato)) throw e; }
+}
+
+G.Nuvola = { Conflitto, NonTrovato, ErroreRete, CARTELLA, NOME_FILE, meta, scarica, carica, crea, trovaMio, daLink,
+  caricaAccanto, scaricaAccanto, eliminaAccanto };
 })(globalThis);

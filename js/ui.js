@@ -33,6 +33,7 @@ async function aggiornaStato() {
   }
   const b = $("badge");
   b.hidden = !S.stato.da_categorizzare; b.textContent = S.stato.da_categorizzare;
+  if (typeof aggiornaBadgeAffitti === "function") await aggiornaBadgeAffitti();
 }
 
 const piuConti = () => S.stato.conti.length > 1;
@@ -55,6 +56,12 @@ async function render() {
   if (S.view === "movimenti") return renderMovimenti();
   if (S.view === "riepilogo") return renderRiepilogo();
   if (S.view === "conti") return renderConti();
+  if (S.view === "affitti") return renderAffitti();
+  if (S.view === "contratti") return renderContratti();
+  if (S.view === "immobili") return renderImmobili();
+  if (S.view === "insoluti") return renderInsoluti();
+  if (S.view === "assicurazioni") return renderAssicurazioni();
+  if (S.view === "scadenze") return renderScadenze();
   if (S.view === "dati") return renderDati();
   return renderRegole();
 }
@@ -175,7 +182,7 @@ function apriCategoria(id) {
   };
 }
 
-function chiudiModal() { $("modal-bg").classList.remove("open"); }
+function chiudiModal() { $("modal-bg").classList.remove("open"); $("modal").classList.remove("larga"); }
 $("modal-bg").addEventListener("click", (e) => { if (e.target.id === "modal-bg") chiudiModal(); });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") chiudiModal(); });
 
@@ -222,6 +229,7 @@ async function importaFile(files) {
   if (r.nuovi && S.stato.mesi.length) S.mese = S.stato.mesi[0];
   render();
   const modal = $("modal");
+  const prop = r.nuovi && api.affitti_proposte ? (await api.affitti_proposte()).length : 0;
   const perFile = r.dettagli.length > 1 || r.dettagli.some((d) => d.conto !== "Conto BNL");
   modal.innerHTML = `
     <h2 id="m-title" style="font-size:22px">Importazione completata</h2>
@@ -237,6 +245,7 @@ async function importaFile(files) {
     ${r.ricariche_aperte ? `<div class="box" style="border-color:rgba(255,176,138,.45)"><b>${r.ricariche_aperte} ${r.ricariche_aperte === 1 ? "ricarica" : "ricariche"} dal conto senza abbinamento</b><div class="note">Non ho trovato sulla carta una ricarica con lo stesso importo entro 3 giorni. Restano tra le uscite in «Prepagata (non dettagliata)»: cercale in Movimenti con «Carta Numero».</div></div>` : ""}
     ${r.errori.length ? `<div class="box" style="border-color:rgba(255,176,138,.45)"><b>File non letti</b>${r.errori.map((e) => `<div class="note">${esc(e)}</div>`).join("")}
       <div class="note">Se è un file BNL, manda a Claude l'intestazione delle colonne (con i dati oscurati).</div></div>` : ""}
+    ${prop ? `<div class="box" style="border-color:rgba(110,240,200,.45)"><b>${prop} ${prop === 1 ? "bonifico sembra un affitto" : "bonifici sembrano affitti"}</b><div class="note">Confermali nella sezione <b>Affitti</b>: un clic e il pagamento è registrato sul mese giusto.</div></div>` : ""}
     ${r.file.length ? `<div class="box"><b>Ricordati di eliminare i file scaricati</b><div class="note">Contengono i tuoi movimenti in chiaro e ora sono già nell'archivio cifrato.
       Il browser non può cancellarli da solo: eliminali dalla cartella Download (e svuota il cestino).<br>${r.file.map(esc).join("<br>")}</div></div>` : ""}
     <div class="actions"><button class="btn primary" type="button" id="m-tieni">Ok</button></div>`;
@@ -780,7 +789,7 @@ async function renderDati() {
 }
 
 /* ---------- Avvio (chiamato da porta.js dopo lo sblocco) ---------- */
-document.querySelectorAll(".nav-btn").forEach((b) => b.onclick = () => { S.view = b.dataset.view; S.dett = null; render(); });
+document.querySelectorAll(".nav-btn").forEach((b) => b.onclick = () => { S.view = b.dataset.view; S.dett = null; if (S.aff) S.aff.dett = null; if (S.imm) S.imm.dett = null; render(); });
 $("btn-backup").onclick = () => window.Porta.scaricaBackup();
 $("btn-blocca").onclick = () => window.Porta.blocca();
 

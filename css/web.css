@@ -93,3 +93,229 @@ details summary { list-style-position: inside; }
 @media (display-mode: standalone) {
   .app { padding-top: max(16px, env(safe-area-inset-top)); }
 }
+
+/* ---------- Affitti e Contratti ---------- */
+:root { --late: #FF8F8F; --warn: #F7D08A; }
+.head .azioni { display: flex; flex-wrap: wrap; gap: 10px; }
+.modal.larga { width: min(820px, 100%); }
+.form-griglia { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.form-griglia[hidden], .check[hidden] { display: none; }
+textarea.input { width: 100%; padding: 12px 14px; min-height: 200px; resize: vertical; font-family: var(--mono); font-size: 13px; line-height: 1.5; }
+code { font-family: var(--mono); font-size: 11px; background: rgba(255,255,255,.06); padding: 1px 5px; border-radius: 6px; }
+.stato { display: inline-flex; align-items: center; min-height: 24px; padding: 0 10px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; }
+.stato.verde { color: var(--in); background: rgba(110,240,200,.10); border-color: rgba(110,240,200,.30); }
+.stato.rosso { color: var(--late); background: rgba(255,143,143,.10); border-color: rgba(255,143,143,.35); }
+.stato.giallo { color: var(--warn); background: rgba(247,208,138,.10); border-color: rgba(247,208,138,.30); }
+.stato.grigio { color: var(--muted); background: rgba(255,255,255,.05); border-color: var(--line); }
+.pannello { padding: 18px 0 14px; display: flex; flex-direction: column; gap: 10px; }
+.pannello-testa { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 0 22px; flex-wrap: wrap; }
+.pannello-testa h2 { margin: 0; font-size: 18px; }
+.tab-scroll { overflow-x: auto; }
+table.griglia { min-width: 760px; }
+table.griglia th { padding: 10px 6px; text-align: center; }
+table.griglia th:first-child { text-align: left; padding-left: 22px; }
+table.griglia td { padding: 8px 4px; }
+table.griglia tbody tr { cursor: default; }
+table.griglia tbody tr:hover td { background: transparent; }
+.g-nome { padding-left: 22px !important; min-width: 170px; position: sticky; left: 0; background: #0D0F14; z-index: 1; }
+td.g, i.g { text-align: center; font-family: var(--mono); font-weight: 700; font-style: normal; }
+td.g { height: 38px; border-radius: 8px; border: 2px solid #0D0F14; }
+td.g[data-gc] { cursor: pointer; }
+td.g[data-gc]:hover, td.g[data-gc]:focus { outline: 1px solid var(--accent); outline-offset: -2px; }
+.g.s-pagato { background: rgba(110,240,200,.16); color: var(--in); }
+.g.s-parziale { background: rgba(247,208,138,.18); color: var(--warn); }
+.g.s-ritardo { background: rgba(255,143,143,.22); color: var(--late); }
+.g.s-attesa { background: rgba(255,255,255,.05); color: var(--muted); }
+.g.s-futuro { background: rgba(255,255,255,.02); }
+.g.s-fuori { background: transparent; }
+.g-legenda { padding: 0 22px; flex-wrap: wrap; }
+.g-legenda i.g { display: inline-flex; width: 20px; height: 20px; align-items: center; justify-content: center; border-radius: 5px; font-size: 11px; margin-right: 6px; }
+table.aff { min-width: 0; }
+table.aff td, table.aff th { padding: 10px 22px; }
+.prop-riga { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr) 150px auto; gap: 10px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
+.prop-riga .input { min-height: 38px; min-width: 0; }
+.prop-mov .stato { margin-left: 6px; min-height: 20px; font-size: 11px; }
+.scadenze { display: flex; flex-direction: column; }
+.scad-riga { display: flex; gap: 14px; align-items: center; text-align: left; padding: 10px 0; border: 0; border-top: 1px solid var(--line); background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.scad-riga:first-child { border-top: 0; }
+.scad-riga:hover b { color: var(--accent); }
+.scad-riga .stato { font-family: var(--mono); min-width: 104px; justify-content: center; }
+.nuovo-inq { padding-top: 10px; border-top: 1px dashed var(--line); }
+@media (max-width: 860px) {
+  .prop-riga { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .prop-riga .prop-mov { grid-column: 1 / -1; }
+  .prop-riga > div:last-child { grid-column: 1 / -1; justify-content: flex-end; }
+}
+@media (max-width: 600px) {
+  .head .azioni { width: 100%; }
+  .head .azioni .btn { flex: 1; justify-content: center; min-height: 40px; padding: 0 12px; }
+  .modal.larga { padding: 18px; }
+  .form-griglia { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+  .form-griglia .input { font-size: 16px; }
+  table.aff td, table.aff th { padding: 8px 10px; font-size: 13px; }
+  .nasc-tel { display: none; }
+  .pannello-testa { padding: 0 14px; }
+  .g-nome { padding-left: 12px !important; min-width: 120px; }
+  .g-legenda { padding: 0 14px; }
+  .scad-riga { gap: 10px; }
+  .scad-riga .stato { min-width: 92px; }
+}
+main > .card { flex: 0 0 auto; }
+.solo-tel { display: none; }
+@media (max-width: 600px) {
+  .solo-tel { display: block; }
+  table.aff .stato { white-space: normal; min-height: 0; padding: 2px 8px; }
+}
+
+/* ---------- Immobili, Insoluti, Assicurazioni, Scadenze ---------- */
+nav { overflow-y: auto; }
+.nav-gruppo { margin: 12px 12px 2px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); opacity: .7; }
+.badge.rosso { background: var(--late); color: #1a0505; }
+.nav-btn.allarme { color: var(--late); }
+.nav-btn.allarme svg { stroke: var(--late); }
+/* avviso prioritario: rosso, in cima, sempre cliccabile */
+.banner-insoluti { display: flex; align-items: center; gap: 14px; width: 100%; padding: 14px 18px; border-radius: 16px; text-align: left; font: inherit; cursor: pointer; flex: 0 0 auto;
+  color: #FFD9D9; background: linear-gradient(90deg, rgba(255,90,90,.22), rgba(255,90,90,.10)); border: 1px solid rgba(255,143,143,.55); box-shadow: 0 0 28px rgba(255,90,90,.18); }
+.banner-insoluti:hover { border-color: rgba(255,143,143,.9); }
+.banner-insoluti.statico { cursor: default; box-shadow: none; }
+.bi-icona { flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--late); color: #1a0505; font-weight: 800; }
+.bi-freccia { margin-left: auto; font-size: 20px; }
+.card-moroso { border-color: rgba(255,143,143,.45) !important; }
+.totale-riga { padding-top: 8px; border-top: 1px dashed var(--line); font-weight: 600; }
+.totale-box { min-height: 44px; display: flex; align-items: center; padding: 0 14px; border-radius: 12px; background: rgba(174,185,255,.10); border: 1px solid rgba(174,185,255,.35); font-size: 18px; font-weight: 600; }
+/* persone in casa */
+.persona { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1.3fr) minmax(0, 1.3fr) auto auto; gap: 10px; align-items: end; padding-top: 10px; border-top: 1px dashed var(--line); }
+.persona .check { min-height: 44px; margin: 0; white-space: nowrap; }
+.persona .op-del { margin-bottom: 4px; }
+/* schede delle case */
+.case-griglia { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+.casa-card { position: relative; overflow: hidden; padding: 20px 20px 16px; border-radius: 20px; display: flex; flex-direction: column; gap: 12px; text-align: left; color: inherit; font: inherit; cursor: pointer; border: 1px solid rgba(255,255,255,.10); }
+.casa-card::before { content: ""; position: absolute; left: 0; top: 0; right: 0; height: 4px; background: var(--in); }
+.casa-card.st-sfitta::before { background: var(--warn); }
+.casa-card.st-scadenza::before { background: var(--warn); }
+.casa-card.st-moroso::before { background: var(--late); }
+.casa-card.st-moroso { border-color: rgba(255,143,143,.45); }
+.casa-card:hover { border-color: rgba(255,255,255,.25); }
+.casa-card h2 { margin: 0; font-size: 18px; }
+.casa-card .row { display: flex; justify-content: space-between; gap: 12px; }
+.cc-top { display: flex; gap: 12px; align-items: flex-start; }
+.cc-nome { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.cc-icona { flex-shrink: 0; width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; background: rgba(174,185,255,.12); color: var(--accent); }
+.st-sfitta .cc-icona { background: rgba(247,208,138,.12); color: var(--warn); }
+.st-moroso .cc-icona { background: rgba(255,143,143,.14); color: var(--late); }
+.cc-main { display: flex; justify-content: space-between; gap: 12px; }
+.cc-main .v { font-family: var(--mono); font-size: 24px; font-weight: 600; margin-top: 2px; letter-spacing: -0.02em; }
+.cc-assic { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 7px 10px; border-radius: 10px; border: 1px solid var(--line); flex: 0 0 auto; }
+.cc-assic.ok { color: var(--in); background: rgba(110,240,200,.06); }
+.cc-assic.inscad { color: var(--warn); background: rgba(247,208,138,.08); }
+.cc-assic.scaduta { color: var(--late); background: rgba(255,143,143,.08); }
+.cc-assic.manca { color: var(--muted); border-style: dashed; }
+.cc-piede { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--muted); padding-top: 10px; border-top: 1px solid var(--line); }
+.due-colonne { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; flex: 0 0 auto; }
+.schede-casa { flex-wrap: wrap; }
+/* insoluti */
+.ins-lista { display: flex; flex-direction: column; gap: 14px; }
+.ins-card { padding: 18px 20px; border-radius: 18px; display: flex; flex-direction: column; gap: 12px; border: 1px solid var(--line); border-left: 6px solid var(--warn); }
+.ins-card.liv-critico { border-left-color: #FF5A5A; background: linear-gradient(90deg, rgba(255,90,90,.12), transparent 60%); border-color: rgba(255,143,143,.45); border-left-color: #FF5A5A; }
+.ins-card.liv-grave { border-left-color: var(--late); background: linear-gradient(90deg, rgba(255,143,143,.08), transparent 60%); }
+.ins-card h2 { margin: 0; font-size: 18px; }
+.ins-testa { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.ins-corpo { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 16px; align-items: start; }
+.ins-importo .v { font-size: 28px; font-weight: 700; color: var(--late); letter-spacing: -0.02em; }
+.liv-rimborsi .ins-importo .v { color: var(--warn); }
+.ins-mesi { display: flex; flex-wrap: wrap; gap: 8px; }
+.ins-mese { padding: 6px 10px; border-radius: 10px; font-size: 13px; background: rgba(247,208,138,.08); border: 1px solid rgba(247,208,138,.28); }
+.ins-mese.grave { background: rgba(255,143,143,.10); border-color: rgba(255,143,143,.40); }
+.ins-mese.spesa { background: rgba(255,255,255,.04); border-color: var(--line); }
+.ins-azioni { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.kpi-allarme { border-color: rgba(255,143,143,.5) !important; background: rgba(255,90,90,.10) !important; }
+.kpi-allarme .v { color: var(--late); }
+.tutto-ok { flex-direction: row !important; align-items: center; gap: 18px !important; max-width: 640px; }
+.ok-icona { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font-size: 26px; font-weight: 700; color: #04130d; background: var(--in); flex-shrink: 0; }
+.card-allarme { border-color: rgba(255,143,143,.45) !important; }
+/* calendario */
+.cal-layout { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 16px; align-items: start; flex: 0 0 auto; }
+.cal-testa { display: flex; align-items: center; gap: 10px; }
+.cal-testa h2 { margin: 0; min-width: 150px; text-align: center; }
+.cal-testa .icon-btn { font-size: 22px; }
+.cal-griglia { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.cal-gs { text-align: center; font-size: 11px; color: var(--muted); text-transform: uppercase; padding: 4px 0; }
+.cal-g { min-height: 86px; padding: 6px; border-radius: 10px; display: flex; flex-direction: column; gap: 4px; align-items: stretch; justify-content: flex-start; text-align: left; font: inherit; color: inherit; cursor: pointer;
+  background: rgba(255,255,255,.025); border: 1px solid rgba(255,255,255,.05); min-width: 0; }
+.cal-g:hover { border-color: rgba(174,185,255,.45); }
+.cal-g.fuori { opacity: .38; }
+.cal-g.oggi { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.cal-g.oggi .cal-n { color: var(--accent); font-weight: 700; }
+.cal-g.sel { background: rgba(174,185,255,.12); border-color: rgba(174,185,255,.6); }
+.cal-g.allarme { border-color: rgba(255,143,143,.5); }
+.cal-n { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.cal-ev { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cal-ev i { font-style: normal; font-size: 10px; line-height: 1.3; padding: 1px 5px; border-radius: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal-ev i.altro { color: var(--muted); }
+.cal-ev i.st-fatto { opacity: .5; text-decoration: line-through; }
+.cal-ev i.st-scaduto { outline: 1px solid var(--late); }
+.cal-pallino { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.e-rata { background: rgba(110,240,200,.16); color: var(--in); }
+.e-contratto { background: rgba(174,185,255,.18); color: var(--accent); }
+.e-disdetta { background: rgba(247,208,138,.18); color: var(--warn); }
+.e-fisco { background: rgba(200,160,255,.16); color: #D2B4FF; }
+.e-assic { background: rgba(120,190,255,.16); color: #9CCBFF; }
+.e-prom { background: rgba(255,176,138,.16); color: var(--out); }
+.cal-pallino.e-rata { background: var(--in); }
+.cal-pallino.e-contratto { background: var(--accent); }
+.cal-pallino.e-disdetta { background: var(--warn); }
+.cal-pallino.e-fisco { background: #D2B4FF; }
+.cal-pallino.e-assic { background: #9CCBFF; }
+.cal-pallino.e-prom { background: var(--out); }
+.ev-lista { display: flex; flex-direction: column; }
+.ev-riga { display: grid; grid-template-columns: 92px 92px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 9px 0; border: 0; border-top: 1px solid var(--line); background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.ev-riga:first-child { border-top: 0; }
+.ev-riga:hover b { color: var(--accent); }
+.ev-data { font-size: 12px; color: var(--muted); }
+.ev-tipo { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 999px; text-align: center; }
+.ev-testo { min-width: 0; display: flex; flex-direction: column; }
+.ev-testo b { font-weight: 500; overflow-wrap: anywhere; }
+.ev-imp { font-size: 13px; }
+.ev-riga.st-fatto { opacity: .55; }
+.ev-riga.st-scaduto .ev-data { color: var(--late); font-weight: 600; }
+@media (max-width: 1100px) {
+  .cal-layout, .due-colonne { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 860px) {
+  .ins-corpo { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .persona { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .persona .field:first-child { grid-column: 1 / -1; }
+}
+@media (max-width: 600px) {
+  nav { overflow-y: visible; }
+  .nav-gruppo { display: none; }
+  .case-griglia { grid-template-columns: 1fr; gap: 10px; }
+  .casa-card { padding: 16px 14px 12px; gap: 10px; }
+  .cc-main .v { font-size: 20px; }
+  .banner-insoluti { padding: 12px; gap: 10px; }
+  .ins-card { padding: 14px; }
+  .ins-importo .v { font-size: 22px; }
+  .ins-azioni .btn { flex: 1; justify-content: center; }
+  .cal-griglia { gap: 2px; }
+  .cal-g { min-height: 46px; padding: 3px; border-radius: 7px; }
+  .cal-ev { flex-direction: row; flex-wrap: wrap; gap: 2px; }
+  .cal-ev i { width: 7px; height: 7px; padding: 0; font-size: 0; border-radius: 50%; }
+  .cal-ev i.e-rata { background: var(--in); }
+  .cal-ev i.e-contratto { background: var(--accent); }
+  .cal-ev i.e-disdetta { background: var(--warn); }
+  .cal-ev i.e-fisco { background: #D2B4FF; }
+  .cal-ev i.e-assic { background: #9CCBFF; }
+  .cal-ev i.e-prom { background: var(--out); }
+  .cal-ev i.altro { display: none; }
+  .ev-riga { grid-template-columns: 76px minmax(0, 1fr) auto; }
+  .ev-riga .ev-tipo { display: none; }
+  .persona .check { min-height: 38px; }
+  .tutto-ok { flex-direction: column !important; text-align: center; }
+}
+.badge[hidden] { display: none; }
+.pill-col { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+.ins-altri { width: 100%; }
+.ins-altri summary { cursor: pointer; color: var(--muted); font-size: 13px; padding: 4px 0; }
+.ins-altri .ins-mesi { margin-top: 8px; }
+.cal-layout .ev-riga { grid-template-columns: 84px minmax(0, 1fr) auto; }
+.cal-layout .ev-tipo { display: none; }
