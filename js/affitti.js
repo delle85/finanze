@@ -2,11 +2,14 @@
 
    I dati stanno nello stesso modello cifrato dei movimenti (quindi: cifratura AES-256, backup,
    sincronizzazione con OneDrive e unione tra dispositivi valgono anche qui). Liste nel modello:
-     immobili   {id, nome, indirizzo, tipologia, superficie, catasto, amministratore, canone_richiesto, note}
+     immobili   {id, nome, indirizzo (via), civico, interno, cap, tipologia, superficie, vani, piano, catasto,
+                 amministratore, amministratore_tel, costo_amministrazione (€/mese a mio carico), canone_richiesto, lavori, note}
      inquilini  {id, nome, codice_fiscale, email, telefono, riconoscimento, note}   (anagrafica dei titolari)
      contratti  {id, immobile, inquilini:[titolare, cointestatari…], occupanti:[{id, nome, relazione, nascita, minore}],
                  tipo, regime ("cedolare"|"ordinario"), inizio, durata_mesi, rinnovo_mesi, preavviso_mesi,
-                 canone, spese_mensili, quota_amministrazione, giorno_pagamento, deposito, istat, registrazione, chiuso_il, note}
+                 canone, spese_mensili, quota_amministrazione, giorno_pagamento, deposito, istat, registrazione, chiuso_il, note,
+                 n_persone, n_minori (dichiarati: valgono se le persone non sono elencate una per una),
+                 inizio_stimato (inizio ricavato dalla scadenza, es. da un import), incassi_dal "AAAA-MM" (prima non si controllano i pagamenti)}
                  (cedolare: booleano dei contratti salvati prima di "regime"; si continua a scriverlo per compatibilità)
      tipi_contratto {id, nome, durata, rinnovo, preavviso, regime, istat, note}   tipi creati dall'utente
      pagamenti  {id, contratto, mese "AAAA-MM", importo, data, metodo, movimento (impronta|null), note}
@@ -111,6 +114,16 @@ function scadenzaRata(c, mese) {
   return `${mese}-${p2(g)}`;
 }
 
+/* Primo mese in cui si controlla il pagamento: inizio del contratto, o "incassi_dal" se è dopo. */
+const primoMeseDovuto = (c) => (c.incassi_dal && c.incassi_dal > meseDi(c.inizio) ? c.incassi_dal : meseDi(c.inizio));
+
+/* Indirizzo leggibile: via, civico, interno, CAP. */
+function indirizzoCompleto(i) {
+  if (!i) return "";
+  const via = [i.indirizzo, i.civico].filter(Boolean).join(" ").trim();
+  return [via, i.interno ? `int. ${i.interno}` : "", i.cap].filter(Boolean).join(", ");
+}
+
 /* Ultimo mese dovuto: fino al mese di chiusura (o di oggi). */
 function ultimoMese(c, fino) {
   const fine = c.chiuso_il && c.chiuso_il < fino ? c.chiuso_il : fino;
@@ -157,14 +170,16 @@ function creaAffitti(M, modificato) {
     const tit = (c.inquilini || []).map((i) => perId("inquilini", i)).filter(Boolean);
     const occ = (Array.isArray(c.occupanti) ? c.occupanti : []).map((o) => ({ ...o, eta: eta(o.nascita, rif), minorenne: minorenne(o, rif),
       relazione_nome: RELAZIONI[o.relazione] || "" }));
+    const elencate = tit.length + occ.length, minori = occ.filter((o) => o.minorenne).length;
     return { titolare: tit[0] || null, cointestatari: tit.slice(1), occupanti: occ,
-      n_persone: tit.length + occ.length, n_minori: occ.filter((o) => o.minorenne).length };
+      n_persone: Math.max(elencate, +c.n_persone || 0), n_minori: Math.max(minori, +c.n_minori || 0),
+      persone_dichiarate: (+c.n_persone || 0) > elencate };
   }
 
   /* Mese per mese: dovuto, pagato, stato. */
   function mesiContratto(c, fino = oggi()) {
     if (!valida(c.inizio)) return [];
-    const ultimo = ultimoMese(c, fino), primo = meseDi(c.inizio);
+    const ultimo = ultimoMese(c, fino), primo = primoMeseDovuto(c);
     if (ultimo < primo) return [];
     const pag = new Map();
     for (const p of M.pagamenti) if (p.contratto === c.id) pag.set(p.mese, r2((pag.get(p.mese) || 0) + p.importo));
@@ -205,11 +220,12 @@ function creaAffitti(M, modificato) {
     const fineCasa = c.chiuso_il && c.chiuso_il < rif ? c.chiuso_il : rif;
     const pp = persone(c, rif), reg = regimeDi(c);
     return {
-      id: c.id, immobile: c.immobile, immobile_nome: imm ? imm.nome : "(casa eliminata)", indirizzo: imm ? imm.indirizzo : "",
+      id: c.id, immobile: c.immobile, immobile_nome: imm ? imm.nome : "(casa eliminata)", indirizzo: indirizzoCompleto(imm),
       inquilini: nomiInquilini(c), inquilini_id: (c.inquilini || []).slice(),
       titolare: pp.titolare ? pp.titolare.nome : "—", titolare_id: pp.titolare ? pp.titolare.id : null,
       titolare_email: pp.titolare ? pp.titolare.email || "" : "", titolare_telefono: pp.titolare ? pp.titolare.telefono || "" : "",
       cointestatari: pp.cointestatari.map((i) => i.nome), occupanti: pp.occupanti, n_persone: pp.n_persone, n_minori: pp.n_minori,
+      persone_dichiarate: pp.persone_dichiarate, inizio_stimato: Boolean(c.inizio_stimato), incassi_dal: c.incassi_dal || null,
       tipo: c.tipo, tipo_nome: tipoInfo(c.tipo).nome, inizio: c.inizio, chiuso_il: c.chiuso_il || null,
       attivo: !c.chiuso_il || c.chiuso_il >= rif,
       canone: c.canone || 0, spese_mensili: c.spese_mensili || 0, quota_amministrazione: c.quota_amministrazione || 0,
@@ -221,7 +237,7 @@ function creaAffitti(M, modificato) {
       mesi_insoluti: scaduti.map((m) => ({ mese: m.mese, dovuto: m.dovuto, pagato: m.pagato, residuo: m.residuo, giorni: m.giorni })),
       spese_da_rimborsare: speseDaRimborsare(c),
       mese_attuale: attuale,
-      in_casa_dal: dal, in_casa_da: durataTesto(dal, fineCasa),
+      in_casa_dal: dal, in_casa_da: c.inizio_stimato && dal === c.inizio ? "" : durataTesto(dal, fineCasa),
       scadenza: sc.fine, disdetta_entro: sc.disdetta, periodo: sc.periodo, scaduto: sc.scaduto && !c.chiuso_il,
       allegati: M.allegati.filter((a) => a.contratto === c.id).length,
       note: c.note || "",
@@ -327,13 +343,139 @@ function creaAffitti(M, modificato) {
       giorno_pagamento: intero(x.giorno_pagamento, 1, 31, 5),
       deposito: numero(x.deposito), cedolare: regime === "cedolare", istat: (x.istat === undefined ? Boolean(t.istat) : Boolean(x.istat)) && regime !== "cedolare",
       registrazione: testo(x.registrazione, 200), chiuso_il: valida(x.chiuso_il) ? x.chiuso_il : null, note: testo(x.note),
+      n_persone: tieni(x, vecchio, "n_persone", (v) => intero(v, 0, 30, 0) || null),
+      n_minori: tieni(x, vecchio, "n_minori", (v) => intero(v, 0, 30, 0) || null),
+      inizio_stimato: tieni(x, vecchio, "inizio_stimato", Boolean),
+      incassi_dal: tieni(x, vecchio, "incassi_dal", (v) => (/^\d{4}-(0[1-9]|1[0-2])$/.test(String(v || "")) ? String(v) : null)),
     };
+  }
+  /* Campo nuovo: se non arriva (form vecchio, import parziale) resta il valore di prima. */
+  function tieni(x, vecchio, k, pulisci) {
+    if (x[k] !== undefined) return pulisci(x[k]);
+    return vecchio && vecchio[k] !== undefined ? vecchio[k] : pulisci(null);
   }
 
   function sostituisci(lista, nuovo) {
     const i = M[lista].findIndex((x) => x.id === nuovo.id);
     if (i >= 0) M[lista][i] = nuovo; else M[lista].push(nuovo);
     return nuovo;
+  }
+
+  /* Campi della casa: quelli non indicati restano come prima. */
+  function pulisciImmobile(x, v) {
+    const k = (campo, f) => (x[campo] !== undefined ? f(x[campo]) : v && v[campo] !== undefined ? v[campo] : f(null));
+    return {
+      indirizzo: k("indirizzo", (t) => testo(t, 300)), civico: k("civico", (t) => testo(t, 20)), interno: k("interno", (t) => testo(t, 20)),
+      cap: k("cap", (t) => testo(t, 10)),
+      tipologia: k("tipologia", (t) => (TIPOLOGIE[t] ? t : "appartamento")),
+      superficie: k("superficie", (t) => intero(t, 0, 100000, 0) || null), vani: k("vani", (t) => numero(t) || null),
+      piano: k("piano", (t) => testo(t, 30)), catasto: k("catasto", (t) => testo(t, 300)),
+      amministratore: k("amministratore", (t) => testo(t, 300)), amministratore_tel: k("amministratore_tel", (t) => testo(t, 60)),
+      costo_amministrazione: k("costo_amministrazione", (t) => numero(t)),
+      canone_richiesto: k("canone_richiesto", (t) => numero(t)), lavori: k("lavori", (t) => testo(t, 2000)), note: k("note", (t) => testo(t)),
+    };
+  }
+
+  /* ---------- importazione delle case da un foglio Excel (già letto da analizzaFoglio) ---------- */
+  const chiaveCasa = (i) => normParole([i.indirizzo, i.civico, i.interno ? "INT " + i.interno : ""].filter(Boolean).join(" "));
+  function trovaTipo(testoTipo, n) {
+    const t = String(testoTipo || "").toLowerCase();
+    const parole = normParole(t);
+    let id = null;
+    if (/4\s*\+\s*4/.test(t) || /\blibero\b/.test(t)) id = "4+4";
+    else if (/3\s*\+\s*2/.test(t) || /concordat/.test(t)) id = "3+2";
+    else if (/6\s*\+\s*6/.test(t) || /commercial|uso diverso|negozio/.test(t)) id = "6+6";
+    else if (/transitori/.test(t)) id = "transitorio";
+    else if (/student|universit/.test(t)) id = "studenti";
+    const regime = /cedolare/.test(t) ? "cedolare" : /ordinari|irpef/.test(t) ? "ordinario" : null;
+    if (id || !parole || /^(CEDOLARE( SECCA)?|ORDINARIO)$/.test(parole)) return { id: id || "4+4", regime };
+    const nome = testo(testoTipo, 100);
+    let tipo = M.tipi_contratto.find((x) => x.nome.toLowerCase() === nome.toLowerCase());
+    if (!tipo) {
+      tipo = sostituisci("tipi_contratto", { id: nuovoId(), nome, durata: 12, rinnovo: 0, preavviso: 0, regime: regime || "ordinario", istat: false,
+        note: "Creato dall'import Excel: controlla durata, rinnovo e preavviso" });
+      n.tipi++;
+    }
+    return { id: tipo.id, regime };
+  }
+
+  function importaVoce(v, opz, n) {
+    // casa
+    const casa = v.casa;
+    const chiave = chiaveCasa(casa), nomeCasa = casa.nome;
+    let imm = M.immobili.find((i) => (chiave && chiaveCasa(i) === chiave) || normParole(i.nome) === normParole(nomeCasa));
+    const campi = {};
+    for (const [k2, val] of Object.entries(casa)) if (k2 !== "nome" && !(imm && k2 === "note") && val !== null && val !== "" && val !== undefined) campi[k2] = val;
+    if (!opz.amm_inquilino && v.contratto && v.contratto.costo_amm) campi.costo_amministrazione = v.contratto.costo_amm;
+    if (imm) { Object.assign(imm, pulisciImmobile(campi, imm)); n.case_agg++; }
+    else { imm = sostituisci("immobili", { id: nuovoId(), nome: nomeCasa, ...pulisciImmobile(campi, null) }); n.case_nuove++; }
+
+    // inquilino
+    let inq = null;
+    const q = v.inquilino;
+    if (q && q.nome) {
+      const email = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(q.email || "") ? q.email : "";
+      const nota = q.email && !email ? `Email nel file: ${q.email}` : "";
+      inq = M.inquilini.find((i) => normParole(i.nome) === normParole(q.nome));
+      if (inq) {
+        if (q.telefono) inq.telefono = testo(q.telefono, 40);
+        if (email) inq.email = testo(email, 200);
+        n.inquilini_agg++;
+      } else {
+        inq = sostituisci("inquilini", { id: nuovoId(), nome: testo(q.nome, 120), codice_fiscale: "", email: testo(email, 200), telefono: testo(q.telefono, 40),
+          riconoscimento: "", note: nota });
+        n.inquilini++;
+      }
+    }
+
+    // contratto (solo con un inquilino; senza, l'affitto diventa il canone richiesto della casa sfitta)
+    const k = v.contratto || {};
+    if (!inq) {
+      if (k.canone > 0) imm.canone_richiesto = k.canone;
+    } else {
+      const tipo = trovaTipo(k.tipo, n);
+      const info = tipoInfo(tipo.id);
+      const scad = valida(k.scadenza) ? k.scadenza : null;
+      const inizio = scad ? piuMesi(piuGiorni(scad, 1), -info.durata) : `${opz.incassi_dal}-01`;
+      const attivi = M.contratti.filter((c) => c.immobile === imm.id && (!c.chiuso_il || c.chiuso_il >= oggi()));
+      const stesso = attivi.find((c) => (c.inquilini || [])[0] === inq.id);
+      const quota = opz.amm_inquilino ? k.costo_amm || 0 : 0;
+      const note = [k.note, scad ? "" : "Scadenza non indicata nel file: controlla data di inizio e durata."].filter(Boolean).join("\n");
+      if (stesso) {
+        const agg = { ...stesso, tipo: tipo.id, canone: k.canone > 0 ? k.canone : stesso.canone, quota_amministrazione: quota || stesso.quota_amministrazione,
+          note: k.note ? testo(k.note) : stesso.note };
+        if (tipo.regime) agg.regime = tipo.regime;
+        if (stesso.inizio_stimato && scad) { agg.inizio = inizio; agg.durata_mesi = info.durata; agg.rinnovo_mesi = info.rinnovo; agg.preavviso_mesi = info.preavviso; }
+        if (k.n_persone !== null) agg.n_persone = k.n_persone;
+        if (k.n_minori !== null) agg.n_minori = k.n_minori;
+        sostituisci("contratti", pulisciContratto(agg, stesso));
+        n.contratti_agg++;
+      } else if (attivi.length) {
+        n.avvisi.push(`${imm.nome}: c'è già un contratto in corso con un altro titolare, non ho creato quello di ${inq.nome}.`);
+      } else {
+        sostituisci("contratti", pulisciContratto({ immobile: imm.id, inquilini: [inq.id], occupanti: [], tipo: tipo.id, regime: tipo.regime || undefined,
+          inizio, canone: k.canone, spese_mensili: 0, quota_amministrazione: quota, giorno_pagamento: 5, deposito: 0, note,
+          n_persone: k.n_persone, n_minori: k.n_minori, inizio_stimato: true, incassi_dal: opz.incassi_dal }, null));
+        n.contratti++;
+        if (!(k.canone > 0)) n.avvisi.push(`${imm.nome}: affitto mensile non indicato, completalo nel contratto.`);
+      }
+    }
+
+    // polizza
+    const p = v.polizza;
+    if (p) {
+      const num = normParole(p.numero);
+      const a = (num && M.assicurazioni.find((x) => normParole(x.numero) === num)) ||
+        M.assicurazioni.find((x) => x.immobile === imm.id && p.compagnia && normParole(x.compagnia) === normParole(p.compagnia)) || null;
+      // senza scadenza nel file: la faccio cadere oggi, così la polizza risulta "in scadenza" e va controllata
+      const decorrenza = valida(p.scadenza) ? piuMesi(p.scadenza, -12) : a ? a.decorrenza : piuMesi(oggi(), -12);
+      const base = a ? { ...a } : { tipo: "altro", contraente: "proprietario", frazionamento: 1, tacito_rinnovo: false, preavviso_giorni: 0, massimale: "", agente: "", disdetta_il: null, note: "" };
+      const dati = { ...base, immobile: imm.id, compagnia: p.compagnia || base.compagnia || "Da completare", numero: p.numero || base.numero || "",
+        premio: p.premio > 0 ? p.premio : base.premio || 0, decorrenza, durata_mesi: 12,
+        note: [base.note, p.info && !a ? `Dal file: ${p.info}` : "", !valida(p.scadenza) && !a ? "Scadenza non indicata nel file." : ""].filter(Boolean).join("\n") };
+      sostituisci("assicurazioni", pulisciAssic(dati, a));
+      if (a) n.polizze_agg++; else n.polizze++;
+    }
   }
 
   /* ---------- scadenze in arrivo ---------- */
@@ -367,7 +509,7 @@ function creaAffitti(M, modificato) {
     const occ = (c.occupanti || []).map((o) => `${o.nome}${RELAZIONI[o.relazione] && o.relazione !== "altro" ? ` (${RELAZIONI[o.relazione].toLowerCase()})` : ""}`);
     const cf = (i) => `${i.nome}${i.codice_fiscale ? ` (C.F. ${i.codice_fiscale})` : ""}`;
     return {
-      casa: imm.nome || "", indirizzo: imm.indirizzo || "", catasto: imm.catasto || "",
+      casa: imm.nome || "", indirizzo: indirizzoCompleto(imm), catasto: imm.catasto || "",
       titolare: inq[0] ? inq[0].nome : "", titolare_cf: inq[0] ? cf(inq[0]) : "",
       inquilini: inq.map((i) => i.nome).join(", "),
       inquilini_cf: inq.map(cf).join(", "),
@@ -446,7 +588,7 @@ function creaAffitti(M, modificato) {
       // rate del mese
       const pag = new Map();
       for (const p of M.pagamenti) if (p.contratto === c.id) pag.set(p.mese, r2((pag.get(p.mese) || 0) + p.importo));
-      const dov = dovutoMese(c), m0 = meseDi(c.inizio) > meseDi(da) ? meseDi(c.inizio) : meseDi(da), m1 = ultimoMese(c, a);
+      const dov = dovutoMese(c), m0 = primoMeseDovuto(c) > meseDi(da) ? primoMeseDovuto(c) : meseDi(da), m1 = ultimoMese(c, a);
       if (dov > 0) for (const mese of mesiTra(m0, m1)) {
         const scad = scadenzaRata(c, mese), pagato = pag.get(mese) || 0;
         add({ ...base, data: scad, tipo: "rata", titolo: "Affitto " + MESI_IT[+mese.slice(5, 7) - 1], mese, importo: dov, residuo: r2(Math.max(0, dov - pagato)),
@@ -473,14 +615,15 @@ function creaAffitti(M, modificato) {
     }
     for (const x of M.assicurazioni) {
       const s = statoAssic(x, rif), imm = x.immobile ? perId("immobili", x.immobile) : null;
+      const nomePol = x.tipo === "altro" && x.compagnia ? x.compagnia : s.tipo_nome;
       const base = { assicurazione: x.id, immobile: x.immobile, immobile_nome: imm ? imm.nome : "", chi: x.compagnia };
       const pre = intero(x.preavviso_giorni, 0, 365, 0);
       for (const p of periodiAssic(x, a)) {
-        add({ ...base, data: p.fine, tipo: "assicurazione", titolo: `Scadenza polizza ${s.tipo_nome}` });
-        if (x.tacito_rinnovo && !x.disdetta_il && pre) add({ ...base, data: piuGiorni(p.fine, -pre), tipo: "disdetta", titolo: `Ultimo giorno per disdire la polizza ${s.tipo_nome}` });
+        add({ ...base, data: p.fine, tipo: "assicurazione", titolo: `Scadenza polizza ${nomePol}` });
+        if (x.tacito_rinnovo && !x.disdetta_il && pre) add({ ...base, data: piuGiorni(p.fine, -pre), tipo: "disdetta", titolo: `Ultimo giorno per disdire la polizza ${nomePol}` });
         for (let i = 0; i < s.frazionamento; i++) {
           const d = piuMesi(p.inizio, (12 / s.frazionamento) * i);
-          if (x.premio > 0) add({ ...base, data: d, tipo: "premio", titolo: `Premio polizza ${s.tipo_nome}`, importo: s.rata });
+          if (x.premio > 0) add({ ...base, data: d, tipo: "premio", titolo: `Premio polizza ${nomePol}`, importo: s.rata });
         }
       }
     }
@@ -523,7 +666,7 @@ function creaAffitti(M, modificato) {
       assic_prossima: assicAttive.reduce((x, a) => (!x || a.scadenza < x ? a.scadenza : x), null),
       n_documenti: M.allegati.filter((a) => a.immobile === i.id || ids.has(a.contratto)).length,
       prossima: prossimi[0] || null,
-      tipologia_nome: TIPOLOGIE[i.tipologia] || "",
+      tipologia_nome: TIPOLOGIE[i.tipologia] || "", indirizzo_completo: indirizzoCompleto(i),
     };
   }
 
@@ -671,14 +814,22 @@ function creaAffitti(M, modificato) {
       };
     },
 
+    /* voci: da FinAffitti.analizzaFoglio; opz: {incassi_dal "AAAA-MM", amm_inquilino}. Una sola scrittura alla fine. */
+    async importa_case(voci, opz = {}) {
+      const o = { incassi_dal: /^\d{4}-(0[1-9]|1[0-2])$/.test(opz.incassi_dal || "") ? opz.incassi_dal : meseDi(oggi()), amm_inquilino: opz.amm_inquilino !== false };
+      const n = { case_nuove: 0, case_agg: 0, inquilini: 0, inquilini_agg: 0, contratti: 0, contratti_agg: 0, polizze: 0, polizze_agg: 0, tipi: 0, avvisi: [] };
+      for (const v of Array.isArray(voci) ? voci : []) {
+        try { importaVoce(v, o, n); } catch (e) { n.avvisi.push(`Riga ${v.riga}: ${e.message || e}`); }
+      }
+      await modificato();
+      return { ok: true, ...n };
+    },
+
     async salva_immobile(x) {
       const nome = testo(x.nome, 120);
       if (!nome) return { ok: false, errore: "Scrivi un nome per la casa (es. Via Roma 12, int. 3)." };
       const v = x.id ? perId("immobili", x.id) : null;
-      const sup = intero(x.superficie, 0, 100000, 0);
-      const r = sostituisci("immobili", { id: v ? v.id : nuovoId(), nome, indirizzo: testo(x.indirizzo, 300),
-        tipologia: TIPOLOGIE[x.tipologia] ? x.tipologia : "appartamento", superficie: sup || null, catasto: testo(x.catasto, 300),
-        amministratore: testo(x.amministratore, 300), canone_richiesto: numero(x.canone_richiesto), note: testo(x.note) });
+      const r = sostituisci("immobili", { ...(v || {}), ...pulisciImmobile(x, v), id: v ? v.id : nuovoId(), nome });
       await modificato();
       return { ok: true, id: r.id };
     },
@@ -779,7 +930,7 @@ function creaAffitti(M, modificato) {
       const mesiAnno = Array.from({ length: 12 }, (_, i) => `${anno}-${p2(i + 1)}`);
       const griglia = contr.filter((c) => c.inizio.slice(0, 4) <= anno && (!c.chiuso_il || c.chiuso_il.slice(0, 4) >= anno)).map((c) => {
         const mm = new Map(mesiContratto(c, rif).map((m) => [m.mese, m]));
-        const dentro = (mese) => mese >= meseDi(c.inizio) && (!c.chiuso_il || mese <= meseDi(c.chiuso_il));
+        const dentro = (mese) => mese >= primoMeseDovuto(c) && (!c.chiuso_il || mese <= meseDi(c.chiuso_il));
         const r = rr.find((x) => x.id === c.id);
         return { contratto: c.id, immobile_nome: r.immobile_nome, inquilini: r.inquilini,
           celle: mesiAnno.map((mese) => mm.get(mese) || { mese, stato: dentro(mese) ? "futuro" : "fuori", dovuto: dentro(mese) ? dovutoMese(c) : 0, pagato: 0, residuo: 0, giorni: 0 }) };
@@ -1014,5 +1165,149 @@ Luogo e data ____________________
 Il locatore ____________________          Il conduttore ____________________
 `;
 
-G.FinAffitti = { creaAffitti, migra, LISTE, TIPI, TIPI_SPESA, TIPI_ASSIC, CONTRAENTI, REGIMI, RELAZIONI, TIPOLOGIE, CAT_AFFITTI, MODELLO_BASE, durataTesto };
+/* ---------------------------------------------------------------------------
+   Import da Excel: riconosce le colonne dalle intestazioni e prepara una voce per riga
+   (casa, inquilino, contratto, polizza). Non scrive nulla: lo fa importa_case dopo l'anteprima.
+   --------------------------------------------------------------------------- */
+const CAMPI_IMPORT = {
+  superficie: "Superficie (m²)", indirizzo: "Indirizzo (via)", civico: "Civico", interno: "Interno", cap: "CAP",
+  tipologia: "Tipologia della casa", vani: "Vani", piano: "Piano", amministratore: "Amministratore", amministratore_tel: "Telefono amministratore",
+  inq_nome: "Inquilino (titolare)", inq_tel: "Telefono inquilino", inq_email: "Email inquilino", n_persone: "Persone in casa", n_minori: "Minorenni",
+  tipo: "Tipo di contratto", scadenza: "Scadenza del contratto", canone: "Affitto mensile", costo_amm: "Costo amministrazione",
+  note: "Note sul contratto", assic_info: "Assicurazione (descrizione)", assic_compagnia: "Compagnia assicurativa", assic_numero: "Numero di polizza",
+  assic_scadenza: "Scadenza della polizza", assic_premio: "Costo della polizza", lavori: "Lavori in corso",
+};
+// in ordine: la prima regola che corrisponde vince (le più specifiche prima)
+const REGOLE_COLONNE = [
+  ["assic_info", (h) => /ASSICURAZIONE SULLA CASA|CON CHI/.test(h)],
+  ["assic_compagnia", (h) => /AZIENDA|COMPAGNIA/.test(h)],
+  ["assic_scadenza", (h) => /SCADENZA/.test(h) && /POLIZZA|ASSICURAZ/.test(h)],
+  ["assic_premio", (h) => /(COSTO|PREMIO|IMPORTO)/.test(h) && /POLIZZA|ASSICURAZ/.test(h)],
+  ["assic_numero", (h) => /POLIZZA/.test(h)],
+  ["amministratore_tel", (h) => /AMMINISTRATORE/.test(h) && /CELL|TEL/.test(h)],
+  ["costo_amm", (h) => /AMMINISTRAZIONE|CONDOMINI/.test(h)],
+  ["amministratore", (h) => /AMMINISTRATORE/.test(h)],
+  ["inq_tel", (h) => /(INQUILINO|LOCATARIO)/.test(h) && /CELL|TEL/.test(h)],
+  ["inq_email", (h) => /MAIL/.test(h)],
+  ["n_minori", (h) => /MINOR/.test(h)],
+  ["n_persone", (h) => /OCCUPANTI|PERSONE/.test(h)],
+  ["tipo", (h) => /CONTRATTO/.test(h) && /TIPO/.test(h)],
+  ["scadenza", (h) => /SCADENZA/.test(h)],
+  ["canone", (h) => /AFFITTO|CANONE|PIGIONE/.test(h)],
+  ["note", (h) => /^NOTE/.test(h)],
+  ["inq_nome", (h) => /INQUILINO|LOCATARIO|CONDUTTORE/.test(h)],
+  ["tipologia", (h) => /TIPOLOGIA|TIPO DI IMMOBILE/.test(h)],
+  ["superficie", (h) => /METRI|^MQ$|SUPERFICIE/.test(h)],
+  ["civico", (h) => /CIVICO/.test(h)],
+  ["interno", (h) => /^INT(ERNO)?$/.test(h)],
+  ["cap", (h) => /^CAP$/.test(h)],
+  ["indirizzo", (h) => /INDIRIZZO|^VIA$/.test(h)],
+  ["vani", (h) => /VANI|LOCALI/.test(h)],
+  ["piano", (h) => /PIANO/.test(h)],
+  ["lavori", (h) => /LAVORI/.test(h)],
+];
+function campoColonna(intestazione) {
+  const h = normParole(intestazione);
+  if (!h) return null;
+  const r = REGOLE_COLONNE.find(([, f]) => f(h));
+  return r ? r[0] : null;
+}
+
+const vuoto = (v) => v === null || v === undefined || String(v).trim() === "";
+const NO = /^(NO|N|NESSUN[AO]?|NESSUNO|NON|ASSENTE|ASSENTI|X|0)$/;
+function cella(v) {
+  if (vuoto(v)) return "";
+  if (typeof v === "number") return Number.isInteger(v) ? String(v) : String(v).replace(".", ",");
+  return String(v).replace(/\s+/g, " ").trim().replace(/^[-–—/]+$/, "");
+}
+function soldi(v) {
+  if (typeof v === "number") return Math.abs(r2(v));
+  const m = String(v ?? "").match(/-?\d[\d.,]*/);
+  if (!m) return 0;
+  const n = G.FinCore ? G.FinCore.parseImporto(m[0].replace(/[.,]$/, "")) : parseFloat(m[0].replace(",", "."));
+  return Number.isFinite(n) ? Math.abs(r2(n)) : 0;
+}
+function contaPersone(v) {
+  if (typeof v === "number") return Math.max(0, Math.min(30, Math.round(v)));
+  const t = normParole(v);
+  if (!t) return null;
+  if (NO.test(t)) return 0;
+  const m = t.match(/\d+/);
+  if (m) return Math.min(30, +m[0]);
+  if (/^(SI|SÌ|S)\b/.test(t)) return 1;
+  return null;
+}
+function dataCella(v) {
+  if (vuoto(v)) return null;
+  const d = G.FinCore ? G.FinCore.parseData(typeof v === "string" ? v.trim() : v) : null;
+  return d && valida(d) ? d : null;
+}
+function tipologiaDa(t) {
+  const x = normParole(t);
+  if (!x) return null;
+  if (/STANZA|CAMERA|POSTO LETTO/.test(x)) return "stanza";
+  if (/BOX|GARAGE|AUTORIMESSA|POSTO AUTO|CANTINA/.test(x)) return "box";
+  if (/NEGOZIO|UFFICIO|LABORATORIO|MAGAZZINO|COMMERCIAL|CAPANNONE/.test(x)) return "negozio";
+  if (/VILLA|INDIPENDENTE|CASA|SCHIERA|RUSTICO/.test(x)) return "casa";
+  if (/APPARTAMENTO|ALLOGGIO|LOCALE|MONO|BILO|TRILO|QUADRI|ATTICO|MANSARDA|LOFT/.test(x)) return "appartamento";
+  return "altro";
+}
+
+function analizzaFoglio(righe) {
+  const R = (Array.isArray(righe) ? righe : []).map((r) => (Array.isArray(r) ? r : []));
+  // riga delle intestazioni: la prima (fra le prime 20) con almeno 4 colonne riconosciute
+  let testa = -1, best = 0;
+  for (let i = 0; i < Math.min(R.length, 20); i++) {
+    const n = R[i].filter((c) => campoColonna(cella(c))).length;
+    if (n >= 4 && n > best) { testa = i; best = n; break; }
+  }
+  if (testa < 0) return { ok: false, errore: "Non trovo la riga delle intestazioni (Indirizzo, Inquilino, Affitto…). Controlla che sia nel primo foglio." };
+  const usati = new Set();
+  const colonne = R[testa].map((h, j) => {
+    const titolo = cella(h);
+    let campo = campoColonna(titolo);
+    if (campo && usati.has(campo)) campo = null;     // la stessa informazione in due colonne: uso la prima
+    if (campo) usati.add(campo);
+    return { j, titolo, campo, nome_campo: campo ? CAMPI_IMPORT[campo] : "" };
+  }).filter((c) => c.titolo);
+  const col = Object.fromEntries(colonne.filter((c) => c.campo).map((c) => [c.campo, c.j]));
+  const v = (r, k) => (col[k] === undefined ? null : r[col[k]]);
+  const t = (r, k) => cella(v(r, k));
+
+  const voci = [], scartate = [];
+  for (let i = testa + 1; i < R.length; i++) {
+    const r = R[i];
+    if (!r.some((c) => !vuoto(c))) continue;
+    const ind = t(r, "indirizzo"), inq = t(r, "inq_nome");
+    if (!ind && !inq) { scartate.push(i + 1); continue; }
+    const civico = t(r, "civico"), interno = t(r, "interno");
+    let cap = t(r, "cap");
+    if (/^\d{1,4}$/.test(cap)) cap = cap.padStart(5, "0");             // Excel toglie gli zeri iniziali (00185)
+    const nome = [ind || `Casa riga ${i + 1}`, civico].filter(Boolean).join(" ") + (interno ? `, int. ${interno}` : "");
+    const lavori = t(r, "lavori");
+    const nInq = NO.test(normParole(inq)) ? "" : inq;
+    const info = t(r, "assic_info"), compagnia = t(r, "assic_compagnia"), numero = t(r, "assic_numero");
+    const premio = soldi(v(r, "assic_premio")), scadPol = dataCella(v(r, "assic_scadenza"));
+    const infoUtile = info && !NO.test(normParole(info)) && !/^(SI|SÌ|S)$/.test(normParole(info));
+    const haPolizza = Boolean(compagnia || numero || premio || scadPol || infoUtile);
+    const tipoRaw = t(r, "tipologia");
+    voci.push({
+      riga: i + 1,
+      casa: { nome, indirizzo: ind, civico, interno, cap, tipologia: tipologiaDa(tipoRaw), superficie: soldi(v(r, "superficie")) || null,
+        vani: soldi(v(r, "vani")) || null, piano: t(r, "piano"), amministratore: t(r, "amministratore"), amministratore_tel: t(r, "amministratore_tel"),
+        lavori: lavori && !NO.test(normParole(lavori)) ? lavori : "",
+        note: tipologiaDa(tipoRaw) === "altro" ? `Tipologia nel file: ${tipoRaw}` : "" },
+      inquilino: nInq ? { nome: nInq, telefono: t(r, "inq_tel"), email: t(r, "inq_email").replace(/^mailto:/i, "") } : null,
+      contratto: { tipo: t(r, "tipo"), scadenza: dataCella(v(r, "scadenza")), scadenza_testo: t(r, "scadenza"), canone: soldi(v(r, "canone")),
+        costo_amm: soldi(v(r, "costo_amm")), n_persone: contaPersone(v(r, "n_persone")), n_minori: contaPersone(v(r, "n_minori")), note: NO.test(normParole(t(r, "note"))) ? "" : t(r, "note") },
+      polizza: haPolizza ? { info: infoUtile ? info : "", compagnia: compagnia || (infoUtile && !numero ? info.replace(/^(si|sì)\b[\s,:-]*/i, "").replace(/^con\s+/i, "") : ""), numero,
+        scadenza: scadPol, premio } : null,
+    });
+  }
+  return { ok: true, riga_intestazioni: testa + 1, colonne, voci, scartate,
+    non_usate: colonne.filter((c) => !c.campo).map((c) => c.titolo),
+    mancanti: ["indirizzo", "inq_nome", "canone"].filter((k) => col[k] === undefined).map((k) => CAMPI_IMPORT[k]) };
+}
+
+G.FinAffitti = { analizzaFoglio, CAMPI_IMPORT, creaAffitti, migra, LISTE, TIPI, TIPI_SPESA, TIPI_ASSIC, CONTRAENTI, REGIMI, RELAZIONI, TIPOLOGIE, CAT_AFFITTI, MODELLO_BASE, durataTesto };
 })(globalThis);

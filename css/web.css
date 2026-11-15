@@ -198,8 +198,9 @@ nav { overflow-y: auto; }
 .casa-card:hover { border-color: rgba(255,255,255,.25); }
 .casa-card h2 { margin: 0; font-size: 1.125rem; }
 .casa-card .row { display: flex; justify-content: space-between; gap: 12px; }
-.cc-top { display: flex; gap: 12px; align-items: flex-start; }
-.cc-nome { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.cc-top { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: flex-start; }
+.cc-top > .stato, .cc-top > .pill-col { margin-left: auto; }
+.cc-nome { flex: 1 1 9.5rem; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .cc-icona { flex-shrink: 0; width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; background: rgba(174,185,255,.12); color: var(--accent); }
 .st-sfitta .cc-icona { background: rgba(247,208,138,.12); color: var(--warn); }
 .st-moroso .cc-icona { background: rgba(255,143,143,.14); color: var(--late); }
@@ -344,3 +345,25 @@ nav { overflow-y: auto; }
   [data-caratteri="150"] .kpis { grid-template-columns: minmax(0, 1fr); }
   [data-caratteri] .car-scelte button { min-width: 0; flex: 1 1 30%; }
 }
+
+/* ---------- Case: lavori in corso, indirizzo a campi, import da Excel ---------- */
+.cc-lavori { display: flex; gap: 8px; align-items: flex-start; padding: 8px 12px; border-radius: 12px; font-size: 0.8125rem;
+  background: rgba(247,208,138,.08); border: 1px solid rgba(247,208,138,.28); color: var(--text); text-align: left; }
+.cc-lavori b { color: var(--warn); font-weight: 600; }
+.casa-indirizzo { grid-template-columns: minmax(0, 3fr) repeat(3, minmax(0, 1fr)); }
+.imp-kpi { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.imp-kpi .kpi { padding: 12px 14px; }
+.imp-kpi .kpi .v { font-size: 1.375rem; margin-top: 4px; }
+.imp-col summary { cursor: pointer; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.imp-col[open] summary { margin-bottom: 6px; }
+.imp-anteprima { max-height: 22rem; overflow: auto; border-radius: 16px; }
+.imp-anteprima table { min-width: 36rem; }
+.imp-anteprima td, .imp-anteprima th { padding: 8px 12px; font-size: 0.8125rem; }
+.imp-anteprima thead th { position: sticky; top: 0; background: #12141a; z-index: 1; }
+@media (max-width: 600px) {
+  .casa-indirizzo { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); }
+  .casa-indirizzo .ci-via { grid-column: 1 / -1; }
+  .imp-kpi { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.conto-righe a, .box a[href^="tel:"] { color: var(--accent); text-decoration: none; }
+.conto-righe a:hover { text-decoration: underline; }

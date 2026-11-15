@@ -96,6 +96,18 @@ AFFITTI E CONTRATTI (case, inquilini, insoluti, assicurazioni, scadenze)
   - "Genera bozza" crea un .doc dal modello da completare in Word sul PC (il modello
     e' solo una traccia da verificare). "Invia per email" e i solleciti NON sono
     cifrati: elimina i file da Download.
+  - Importa da Excel (Immobili -> "Importa da Excel"): case, inquilini, contratti e
+    polizze da un foglio con le intestazioni in una riga (Indirizzo, Civico, Interno,
+    CAP, Metri quadri, Vani, Piano, Amministratore, Inquilino, Cellulare, Mail,
+    N occupanti, Minori, Tipologia di contratto, Scadenza contratto, Affitto mensile,
+    Costo amministrazione, Note, Azienda assicuratrice, N polizza, Scadenza polizza,
+    Costo della polizza, Lavori attivi...). Il file si legge solo nel browser e i dati
+    finiscono nell'archivio cifrato. Prima di importare c'e' un'anteprima con le
+    colonne riconosciute. Reimportando lo stesso file le case (stesso indirizzo),
+    gli inquilini (stesso nome) e le polizze (stesso numero) si aggiornano, non si
+    duplicano. L'inizio dei contratti e' ricavato dalla scadenza ("stimata"); i
+    pagamenti si controllano dal mese scelto nell'import (prima: niente arretrati).
+    Dopo l'import elimina il file Excel se contiene dati personali in chiaro.
   IMPORTANTE: aggiorna (ricarica) l'app su tutti i dispositivi prima di inserire
   i contratti: una versione vecchia aperta altrove, unendo i dati, perderebbe
   le nuove sezioni.

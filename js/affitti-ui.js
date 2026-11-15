@@ -379,8 +379,9 @@ function corpoInquilini(an) {
 
 /* ---------- Scheda di un contratto (documenti, email, modifica) ---------- */
 function righeOccupanti(s) {
-  if (!s.occupanti.length) return `<div class="note">Nessun'altra persona indicata.</div>`;
-  return s.occupanti.map((o) => `<div class="row"><span>${esc(o.nome)} <span class="note">${esc(o.relazione_nome)}</span></span>
+  const dich = s.persone_dichiarate ? `<div class="note">In totale ${personeTesto(s)} (numero indicato senza nomi).</div>` : "";
+  if (!s.occupanti.length) return dich || `<div class="note">Nessun'altra persona indicata.</div>`;
+  return dich + s.occupanti.map((o) => `<div class="row"><span>${esc(o.nome)} <span class="note">${esc(o.relazione_nome)}</span></span>
     <span>${o.minorenne ? `<span class="stato giallo">Minorenne${o.eta !== null ? ` · ${o.eta} anni` : ""}</span>` : o.eta !== null ? `<span class="note">${o.eta} anni</span>` : ""}</span></div>`).join("");
 }
 
@@ -401,7 +402,7 @@ async function apriContratto(id) {
     <div class="box">
       ${riga("Tipo", esc(s.tipo_nome))}
       ${riga("Regime fiscale", esc(s.regime_nome))}
-      ${riga("Inizio", dataIt(s.inizio) + ` · durata ${d.durata_mesi} mesi${d.rinnovo_mesi ? ` + rinnovo ${d.rinnovo_mesi}` : ""}`)}
+      ${riga("Inizio", dataIt(s.inizio) + (s.inizio_stimato ? ` <span class="stato giallo" style="min-height:0">stimata</span>` : "") + ` · durata ${d.durata_mesi} mesi${d.rinnovo_mesi ? ` + rinnovo ${d.rinnovo_mesi}` : ""}`)}
       ${s.chiuso_il ? riga("Chiuso il", dataIt(s.chiuso_il)) : riga(s.scaduto ? "Scaduto il" : "Prossima scadenza", s.scadenza ? dataIt(s.scadenza) : "—")}
       ${!s.chiuso_il && s.disdetta_entro && !s.scaduto ? riga("Disdetta entro", `${dataIt(s.disdetta_entro)} <span class="note">(preavviso ${d.preavviso_mesi} mesi)</span>`) : ""}
       ${riga("In casa da", `${esc(s.in_casa_da || "—")} <span class="note">(dal ${dataIt(s.in_casa_dal)})</span>`)}
@@ -414,6 +415,7 @@ async function apriContratto(id) {
       ${s.quota_amministrazione ? riga("Quota amministrazione", `<span class="num">${euro(s.quota_amministrazione)}</span>`) : ""}
       <div class="row totale-riga"><span>Totale mensile</span><span class="num">${euro(s.dovuto)}</span></div>
       ${riga("Pagamento entro il", `giorno ${s.giorno_pagamento}`)}
+      ${s.incassi_dal ? riga("Pagamenti controllati dal", esc(meseIt(s.incassi_dal))) : ""}
       ${s.deposito ? riga("Deposito cauzionale", `<span class="num">${euro(s.deposito)}</span>`) : ""}
       ${s.note ? `<div class="note" style="white-space:pre-wrap">${esc(s.note)}</div>` : ""}
     </div>
@@ -522,13 +524,17 @@ async function apriFormContratto(id, pre = null) {
     <div class="box"><div class="row" style="align-items:center"><b>Altre persone che vivono nella casa</b><span class="note" id="fc-conta"></span></div>
       <div class="note">Familiari, figli, coinquilini. Per i figli basta segnare «Minorenne»; con la data di nascita l'app calcola da sola quando diventano maggiorenni.</div>
       <div id="fc-persone">${(x.occupanti || []).map((o, k) => rigaPersona(o, k)).join("")}</div>
-      <div><button class="btn small" type="button" id="fc-add-p">+ Aggiungi persona</button></div></div>
+      <div><button class="btn small" type="button" id="fc-add-p">+ Aggiungi persona</button></div>
+      <div class="form-griglia">
+        <div class="field"><label for="fc-npers">Persone in casa in totale <span class="note">(se non le elenchi)</span></label><input class="input" id="fc-npers" inputmode="numeric" value="${esc(x.n_persone || "")}" placeholder="—"></div>
+        <div class="field"><label for="fc-nmin">di cui minorenni</label><input class="input" id="fc-nmin" inputmode="numeric" value="${esc(x.n_minori || "")}" placeholder="—"></div>
+      </div></div>
     <div class="box"><b>Contratto</b>
       <div class="form-griglia">
         <div class="field"><label for="fc-tipo">Tipo di contratto</label><select class="input" id="fc-tipo">${tipi.map((t) => `<option value="${esc(t.id)}" ${t.id === x.tipo ? "selected" : ""}>${esc(t.nome)}${t.personalizzato ? " ★" : ""}</option>`).join("")}
           <option value="__nuovo">+ Crea un nuovo tipo…</option></select></div>
         <div class="field"><label for="fc-regime">Regime fiscale</label><select class="input" id="fc-regime">${Object.entries(REG).map(([k, t]) => `<option value="${k}" ${k === x.regime ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></div>
-        <div class="field"><label for="fc-inizio">Data di inizio</label><input class="input" id="fc-inizio" type="date" value="${esc(x.inizio || "")}"></div>
+        <div class="field"><label for="fc-inizio">Data di inizio${x.inizio_stimato ? ` <span class="stato giallo" style="min-height:0">stimata</span>` : ""}</label><input class="input" id="fc-inizio" type="date" value="${esc(x.inizio || "")}"></div>
         <div class="field"><label for="fc-durata">Durata (mesi)</label><input class="input" id="fc-durata" inputmode="numeric" value="${esc(x.durata_mesi ?? "")}"></div>
         <div class="field"><label for="fc-rinnovo">Rinnovo automatico (mesi, 0 = no)</label><input class="input" id="fc-rinnovo" inputmode="numeric" value="${esc(x.rinnovo_mesi ?? 0)}"></div>
         <div class="field"><label for="fc-preavviso">Preavviso disdetta (mesi)</label><input class="input" id="fc-preavviso" inputmode="numeric" value="${esc(x.preavviso_mesi ?? 0)}"></div>
@@ -543,7 +549,10 @@ async function apriFormContratto(id, pre = null) {
         <div class="field"><label>Totale mensile</label><div class="totale-box num" id="fc-totale" aria-live="polite">—</div></div>
         <div class="field"><label for="fc-giorno">Pagamento entro il giorno</label><input class="input" id="fc-giorno" inputmode="numeric" value="${esc(x.giorno_pagamento ?? 5)}"></div>
         <div class="field"><label for="fc-dep">Deposito cauzionale (€)</label><input class="input" id="fc-dep" inputmode="decimal" autocomplete="off" value="${esc(importoIt(x.deposito))}" placeholder="0"></div>
-      </div></div>
+        <div class="field"><label for="fc-incassi">Controlla i pagamenti dal mese</label><input class="input" id="fc-incassi" type="month" value="${esc(x.incassi_dal || "")}"></div>
+      </div>
+      <div class="note">«Controlla i pagamenti dal mese»: lascialo vuoto per controllare tutto dall'inizio del contratto. Serve per i contratti iniziati prima che usassi l'app: i mesi precedenti non risultano da incassare.</div></div>
+    ${x.inizio_stimato ? `<div class="note" style="color:var(--warn)">La data di inizio è stata ricavata dalla scadenza (import da Excel): correggila se la conosci.</div>` : ""}
     ${id ? `<div class="form-griglia"><div class="field"><label for="fc-chiuso">Chiuso il (inquilino uscito)</label><input class="input" id="fc-chiuso" type="date" value="${esc(x.chiuso_il || "")}"></div></div>` : ""}
     <div class="field"><label for="fc-note">Note</label><textarea class="input" id="fc-note" rows="3" style="min-height:80px;font-family:inherit">${esc(x.note || "")}</textarea></div>
     <div class="actions"><button class="btn" type="button" id="m-annulla">Annulla</button><button class="btn primary" type="button" id="fc-ok">Salva contratto</button></div>`, true);
@@ -557,8 +566,8 @@ async function apriFormContratto(id, pre = null) {
   let k = (x.occupanti || []).length;
   const aggiornaConta = () => {
     const pp = [...m.querySelectorAll(".persona")].filter((d) => d.querySelector('[data-k="nome"]').value.trim());
-    const min = pp.filter((d) => { const n = d.querySelector('[data-k="nascita"]').value; const e = etaDa(n); return e !== null ? e < 18 : d.querySelector('[data-k="minore"]').checked; }).length;
-    const tot = pp.length + 1 + cointestatari.length;
+    const min = pp.filter((d) => { const n = d.querySelector('[data-k="nascita"]').value; const e = etaDa(n); return e !== null ? e < 18 : d.querySelector('[data-k="minore"]').checked; }).length || +val("fc-nmin") || 0;
+    const tot = Math.max(pp.length + 1 + cointestatari.length, +val("fc-npers") || 0);
     $("fc-conta").textContent = `${tot} ${tot === 1 ? "persona" : "persone"} in casa${min ? ` · ${min} ${min === 1 ? "minorenne" : "minorenni"}` : ""}`;
   };
   const collegaPersona = (d) => {
@@ -568,6 +577,7 @@ async function apriFormContratto(id, pre = null) {
     min.onchange = aggiornaConta; d.querySelector('[data-k="nome"]').oninput = aggiornaConta;
   };
   m.querySelectorAll(".persona").forEach(collegaPersona);
+  $("fc-npers").oninput = aggiornaConta; $("fc-nmin").oninput = aggiornaConta;
   $("fc-add-p").onclick = () => {
     const t = document.createElement("div");
     t.innerHTML = rigaPersona({}, k++);
@@ -613,6 +623,8 @@ async function apriFormContratto(id, pre = null) {
       durata_mesi: val("fc-durata"), rinnovo_mesi: val("fc-rinnovo"), preavviso_mesi: val("fc-preavviso"), registrazione: val("fc-reg"),
       canone: val("fc-canone"), spese_mensili: val("fc-spese"), quota_amministrazione: val("fc-amm"), giorno_pagamento: val("fc-giorno"), deposito: val("fc-dep"),
       istat: $("fc-istat").checked, chiuso_il: id ? val("fc-chiuso") : null, note: val("fc-note"),
+      n_persone: val("fc-npers"), n_minori: val("fc-nmin"), incassi_dal: val("fc-incassi"),
+      inizio_stimato: Boolean(x.inizio_stimato) && val("fc-inizio") === x.inizio,
     };
   }
   $("fc-ok").onclick = async () => {
@@ -704,19 +716,33 @@ function apriCasa(c, dopo = null) {
       <div class="field"><label for="ca-nome">Nome breve</label><input class="input" id="ca-nome" value="${esc(c.nome || "")}" placeholder="es. Via Roma 12, int. 3"></div>
       <div class="field"><label for="ca-tip">Tipologia</label><select class="input" id="ca-tip">${Object.entries(TIP).map(([k, t]) => `<option value="${k}" ${k === (c.tipologia || "appartamento") ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></div>
     </div>
-    <div class="field"><label for="ca-ind">Indirizzo completo</label><input class="input" id="ca-ind" value="${esc(c.indirizzo || "")}"></div>
+    <div class="form-griglia casa-indirizzo">
+      <div class="field ci-via"><label for="ca-ind">Indirizzo (via, piazza…)</label><input class="input" id="ca-ind" value="${esc(c.indirizzo || "")}"></div>
+      <div class="field"><label for="ca-civ">Civico</label><input class="input" id="ca-civ" value="${esc(c.civico || "")}"></div>
+      <div class="field"><label for="ca-int">Interno</label><input class="input" id="ca-int" value="${esc(c.interno || "")}"></div>
+      <div class="field"><label for="ca-cap">CAP</label><input class="input" id="ca-cap" inputmode="numeric" value="${esc(c.cap || "")}"></div>
+    </div>
     <div class="form-griglia">
       <div class="field"><label for="ca-mq">Superficie (m²)</label><input class="input" id="ca-mq" inputmode="numeric" value="${esc(c.superficie || "")}"></div>
+      <div class="field"><label for="ca-vani">Vani</label><input class="input" id="ca-vani" inputmode="decimal" value="${esc(c.vani ? String(c.vani).replace(".", ",") : "")}"></div>
+      <div class="field"><label for="ca-piano">Piano</label><input class="input" id="ca-piano" value="${esc(c.piano || "")}" placeholder="es. 2, terra, ultimo"></div>
       <div class="field"><label for="ca-rich">Canone richiesto se sfitta (€)</label><input class="input" id="ca-rich" inputmode="decimal" value="${esc(importoIt(c.canone_richiesto))}" placeholder="facoltativo"></div>
     </div>
     <div class="field"><label for="ca-cat">Dati catastali</label><input class="input" id="ca-cat" value="${esc(c.catasto || "")}" placeholder="es. foglio 12, particella 345, sub 6, cat. A/2, rendita 750 €"></div>
-    <div class="field"><label for="ca-amm">Amministratore di condominio</label><input class="input" id="ca-amm" value="${esc(c.amministratore || "")}" placeholder="nome, telefono, email"></div>
+    <div class="form-griglia">
+      <div class="field"><label for="ca-amm">Amministratore di condominio</label><input class="input" id="ca-amm" value="${esc(c.amministratore || "")}" placeholder="nome o studio"></div>
+      <div class="field"><label for="ca-amm-tel">Telefono amministratore</label><input class="input" id="ca-amm-tel" type="tel" value="${esc(c.amministratore_tel || "")}"></div>
+      <div class="field"><label for="ca-amm-costo">Spese condominio a tuo carico (€/mese)</label><input class="input" id="ca-amm-costo" inputmode="decimal" value="${esc(importoIt(c.costo_amministrazione))}" placeholder="0"></div>
+    </div>
+    <div class="field"><label for="ca-lav">Lavori in corso</label><input class="input" id="ca-lav" value="${esc(c.lavori || "")}" placeholder="es. rifacimento facciata, cambio caldaia (vuoto = nessuno)"></div>
     <div class="field"><label for="ca-note">Note (contatori, chiavi, caldaia…)</label><textarea class="input" id="ca-note" rows="3" style="min-height:80px;font-family:inherit">${esc(c.note || "")}</textarea></div>
     <div class="actions">${mod ? `<button class="btn" type="button" id="ca-del" style="margin-right:auto">Elimina</button>` : ""}
       <button class="btn" type="button" id="m-annulla">Annulla</button><button class="btn primary" type="button" id="ca-ok">Salva</button></div>`, true);
   $("ca-ok").onclick = async () => {
-    const r = await conErrore(() => api.salva_immobile({ id: c.id, nome: val("ca-nome"), tipologia: val("ca-tip"), indirizzo: val("ca-ind"), superficie: val("ca-mq"),
-      canone_richiesto: val("ca-rich"), catasto: val("ca-cat"), amministratore: val("ca-amm"), note: val("ca-note") }));
+    const r = await conErrore(() => api.salva_immobile({ id: c.id, nome: val("ca-nome"), tipologia: val("ca-tip"), indirizzo: val("ca-ind"),
+      civico: val("ca-civ"), interno: val("ca-int"), cap: val("ca-cap"), superficie: val("ca-mq"), vani: val("ca-vani"), piano: val("ca-piano"),
+      canone_richiesto: val("ca-rich"), catasto: val("ca-cat"), amministratore: val("ca-amm"), amministratore_tel: val("ca-amm-tel"),
+      costo_amministrazione: val("ca-amm-costo"), lavori: val("ca-lav"), note: val("ca-note") }));
     if (r) { await dopoModifica("Casa salvata"); if (dopo) dopo(r.id); }
   };
   if ($("ca-del")) $("ca-del").onclick = async () => {

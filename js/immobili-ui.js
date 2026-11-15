@@ -27,12 +27,20 @@ function rigaAssicurazione(c) {
   return `<div class="cc-assic ${c.assic_in_scadenza ? "inscad" : "ok"}">${ICONA_SCUDO}<span>${c.assic_in_scadenza ? "Polizza in scadenza" : "Assicurata"} · scade il ${dataIt(c.assic_prossima)}</span></div>`;
 }
 
+/* "Appartamento · 75 m² · 3 vani · piano 2" */
+function datiCasaTesto(c) {
+  const piano = c.piano ? (/^\d+$/.test(String(c.piano)) ? `piano ${c.piano}` : /piano/i.test(c.piano) ? c.piano : `piano ${c.piano}`) : "";
+  return [c.tipologia_nome, c.superficie ? c.superficie + " m²" : "", c.vani ? `${String(c.vani).replace(".", ",")} vani` : "", piano].filter(Boolean).join(" · ");
+}
+const lavoriRiga = (c) => (c.lavori ? `<div class="cc-lavori"><span aria-hidden="true">🔧</span><span><b>Lavori in corso:</b> ${esc(c.lavori)}</span></div>` : "");
+
 function casaCard(c) {
   const st = statoCasa(c), k = c.contratto;
   const riga = (t, v, stile = "") => `<div class="row"><span class="note">${t}</span><span style="text-align:right;${stile}">${v}</span></div>`;
+  const indir = c.indirizzo_completo && c.indirizzo_completo.toLowerCase() !== c.nome.toLowerCase() ? c.indirizzo_completo : "";
   return `<button type="button" class="casa-card glass st-${st.cls}" data-casa="${esc(c.id)}" title="Apri ${esc(c.nome)}">
     <div class="cc-top"><span class="cc-icona">${ICONA_CASA}</span>
-      <span class="cc-nome"><h2>${esc(c.nome)}</h2><span class="note">${esc([c.tipologia_nome, c.superficie ? c.superficie + " m²" : ""].filter(Boolean).join(" · ") || c.indirizzo || "")}</span></span>
+      <span class="cc-nome"><h2>${esc(c.nome)}</h2><span class="note">${esc([datiCasaTesto(c), indir && !datiCasaTesto(c) ? indir : ""].filter(Boolean).join(" · "))}</span></span>
       ${st.pill}</div>
     ${k ? `<div class="cc-main"><div><div class="sub">Totale al mese</div><div class="v">${euro(k.dovuto)}</div></div>
         ${c.insoluto > 0 ? `<div style="text-align:right"><div class="sub">Da incassare</div><div class="v" style="color:var(--late)">${euro(c.insoluto)}</div></div>` : ""}</div>
@@ -47,6 +55,7 @@ function casaCard(c) {
         ${riga("Canone richiesto", c.canone_richiesto ? `<span class="num">${euro(c.canone_richiesto)}</span>` : `<span class="note">—</span>`)}
         ${c.insoluto > 0 ? riga("Ancora da incassare", `<span class="num">${euro(c.insoluto)}</span>`, "color:var(--late)") : ""}
       </div>`}
+    ${lavoriRiga(c)}
     ${rigaAssicurazione(c)}
     <div class="cc-piede"><span>Netto ${esc(String(S.imm.anno))}: <b class="num" style="color:${c.netto_anno < 0 ? "var(--out)" : "var(--in)"}">${euro(c.netto_anno)}</b></span>
       <span>${[c.n_documenti ? `📎 ${c.n_documenti}` : "", c.prossima ? `${esc(c.prossima.titolo)} ${quandoTesto(giorniDa(c.prossima.data))}` : ""].filter(Boolean).join(" · ")}</span></div>
@@ -63,15 +72,17 @@ async function renderImmobili() {
       <div class="card glass" style="max-width:640px"><h2>Aggiungi le tue case</h2>
         <div class="note" style="font-size:0.875rem;color:var(--text)">Ogni casa diventa una scheda: vedi subito se è affittata o sfitta, chi ci vive, quanto rende,
           le spese, l'assicurazione e i documenti (APE, planimetria, visura). Puoi aggiungere anche case sfitte.</div>
-        <div><button class="btn primary" type="button" id="im-prima">+ Aggiungi la prima casa</button></div></div>`;
+        <div style="display:flex;flex-wrap:wrap;gap:10px"><button class="btn primary" type="button" id="im-prima">+ Aggiungi la prima casa</button>
+          <button class="btn" type="button" id="im-importa">Importa da Excel</button></div></div>`;
     $("im-prima").onclick = () => apriCasa({}, (id) => { S.imm.dett = id; render(); });
+    $("im-importa").onclick = apriImportExcel;
     return;
   }
   const f = S.imm.filtro;
   const lista = r.case.filter((c) => f === "tutte" || (f === "affittate" ? c.stato === "affittata" : c.stato === "sfitta"));
   main.innerHTML = `
     <div class="head"><div><div class="sub">Le tue case, affittate e sfitte</div><h1>Immobili</h1></div>
-      <div class="azioni"><button class="btn primary" type="button" id="im-nuova">+ Nuova casa</button></div></div>
+      <div class="azioni"><button class="btn" type="button" id="im-importa">Importa da Excel</button><button class="btn primary" type="button" id="im-nuova">+ Nuova casa</button></div></div>
     ${bannerInsoluti()}
     <div class="kpis">
       <div class="kpi glass"><div class="sub">Case</div><div class="v">${r.n}</div><div class="note">${r.affittate} affittate · ${r.sfitte} sfitte</div></div>
@@ -85,6 +96,7 @@ async function renderImmobili() {
     ${r.senza_assicurazione ? `<div class="note">${r.senza_assicurazione} ${r.senza_assicurazione === 1 ? "casa non ha" : "case non hanno"} una polizza attiva registrata: aggiungila in <b>Assicurazioni</b> o nella scheda della casa.</div>` : ""}`;
   collegaBanner(main);
   $("im-nuova").onclick = () => apriCasa({}, (id) => { S.imm.dett = id; S.imm.tab = "panoramica"; render(); });
+  $("im-importa").onclick = apriImportExcel;
   main.querySelectorAll("[data-filtro]").forEach((b) => b.onclick = () => { S.imm.filtro = b.dataset.filtro; render(); });
   main.querySelectorAll("[data-casa]").forEach((b) => b.onclick = () => { S.imm.dett = b.dataset.casa; S.imm.tab = "panoramica"; render(); });
 }
@@ -139,10 +151,15 @@ async function renderImmobileDettaglio() {
       <div class="note">Della casa: APE, planimetria, visura catastale, certificazioni impianti, verbali di consegna. I documenti dei contratti si allegano dal contratto.</div>
       <div><button class="btn small" type="button" id="id-allega">+ Allega documento della casa</button></div></section>`;
   } else if (tab === "scheda") {
+    const tel = (n) => (n ? `<a href="tel:${esc(String(n).replace(/[^\d+]/g, ""))}" onclick="event.stopPropagation()">${esc(n)}</a>` : "");
     corpo = `<section class="card glass"><div class="conto-righe">
-      ${riga("Nome", esc(d.nome))}${riga("Indirizzo", esc(d.indirizzo || "—"))}${riga("Tipologia", esc(d.tipologia_nome || "—"))}
-      ${riga("Superficie", d.superficie ? `${d.superficie} m²` : "—")}${riga("Dati catastali", esc(d.catasto || "—"))}
-      ${riga("Amministratore", esc(d.amministratore || "—"))}${riga("Canone richiesto se sfitta", d.canone_richiesto ? euro(d.canone_richiesto) : "—")}</div>
+      ${riga("Nome", esc(d.nome))}${riga("Indirizzo", esc(d.indirizzo_completo || "—"))}${riga("Tipologia", esc(d.tipologia_nome || "—"))}
+      ${riga("Superficie", d.superficie ? `${d.superficie} m²` : "—")}${riga("Vani", d.vani ? esc(String(d.vani).replace(".", ",")) : "—")}${riga("Piano", esc(d.piano || "—"))}
+      ${riga("Dati catastali", esc(d.catasto || "—"))}
+      ${riga("Amministratore", [esc(d.amministratore || ""), tel(d.amministratore_tel)].filter(Boolean).join(" · ") || "—")}
+      ${riga("Spese condominio a tuo carico", d.costo_amministrazione ? `${euro(d.costo_amministrazione)} al mese` : "—")}
+      ${riga("Canone richiesto se sfitta", d.canone_richiesto ? euro(d.canone_richiesto) : "—")}
+      ${riga("Lavori in corso", d.lavori ? esc(d.lavori) : "nessuno", d.lavori ? "color:var(--warn)" : "")}</div>
       ${d.note ? `<div class="note" style="white-space:pre-wrap">${esc(d.note)}</div>` : ""}
       <div><button class="btn" type="button" id="id-mod2">Modifica i dati</button></div></section>`;
   } else {
@@ -170,17 +187,18 @@ async function renderImmobileDettaglio() {
   }
   main.innerHTML = `
     <div class="head"><div><button class="btn small" type="button" id="id-indietro">← Immobili</button>
-      <h1 style="margin-top:10px">${esc(d.nome)}</h1><div class="sub">${esc([d.indirizzo, d.tipologia_nome, d.superficie ? d.superficie + " m²" : ""].filter(Boolean).join(" · "))}</div></div>
+      <h1 style="margin-top:10px">${esc(d.nome)}</h1><div class="sub">${esc([d.indirizzo_completo, datiCasaTesto(d)].filter(Boolean).join(" · "))}</div></div>
       <div class="azioni"><button class="btn" type="button" id="id-mod">Modifica casa</button><button class="btn" type="button" id="id-spesa">+ Spesa</button>
         ${k ? `<button class="btn primary" type="button" id="id-pag">+ Registra pagamento</button>` : `<button class="btn primary" type="button" id="id-nuovo-c2">+ Nuovo contratto</button>`}</div></div>
     ${d.insoluto > 0 ? `<button type="button" class="banner-insoluti" data-vai="insoluti"><span class="bi-icona" aria-hidden="true">!</span>
       <span><b>Da incassare su questa casa: ${euro(d.insoluto)}</b><span class="note" style="display:block;color:inherit;opacity:.85">Apri Insoluti per il dettaglio e il sollecito</span></span><span class="bi-freccia" aria-hidden="true">→</span></button>` : ""}
     <div class="kpis">
-      <div class="kpi glass"><div class="sub">Stato</div><div style="margin-top:8px">${st.pill}</div><div class="note" style="margin-top:6px">${k ? `da ${esc(k.in_casa_da || "—")}` : d.giorni_sfitta !== null ? `sfitta da ${d.giorni_sfitta} giorni` : "mai affittata"}</div></div>
+      <div class="kpi glass"><div class="sub">Stato</div><div style="margin-top:8px">${st.pill}</div><div class="note" style="margin-top:6px">${k ? (k.in_casa_da ? `da ${esc(k.in_casa_da)}` : "inizio contratto stimato") : d.giorni_sfitta !== null ? `sfitta da ${d.giorni_sfitta} giorni` : "mai affittata"}</div></div>
       <div class="kpi glass"><div class="sub">Incassato ${esc(d.anno)}</div><div class="v" style="color:var(--in)">${euro(d.incassato_anno)}</div></div>
       <div class="kpi glass"><div class="sub">Spese ${esc(d.anno)}</div><div class="v" style="color:var(--out)">${euro(d.spese_anno)}</div></div>
       <div class="kpi glass"><div class="sub">Netto ${esc(d.anno)}</div><div class="v">${euro(d.netto_anno)}</div></div>
     </div>
+    ${lavoriRiga(d)}
     ${rigaAssicurazione(d)}
     <div class="seg schede-casa" role="tablist" aria-label="Sezioni della casa">${tabs.map(([t, n]) => `<button type="button" role="tab" data-itab="${t}" class="${tab === t ? "on" : ""}" aria-selected="${tab === t}">${n}</button>`).join("")}</div>
     ${corpo}`;
@@ -500,3 +518,85 @@ async function apriPromemoria(id, data) {
   };
 }
 async function trovaPromemoria(id) { const p = await api.promemoria_dati(id); return p ? p.data : oggiIso(); }
+
+/* =====================================================================
+   IMPORT DA EXCEL: case, inquilini, contratti e polizze da un foglio.
+   Il file viene letto qui nel browser e finisce solo nell'archivio cifrato.
+   ===================================================================== */
+function apriImportExcel() {
+  const inp = document.createElement("input");
+  inp.type = "file"; inp.accept = ".xlsx,.xls,.xlsm,.csv"; inp.hidden = true;
+  document.body.appendChild(inp);
+  inp.onchange = async () => {
+    const f = inp.files[0];
+    inp.remove();
+    if (!f) return;
+    try {
+      const a = FinAffitti.analizzaFoglio(FinCore.leggiRighe(await f.arrayBuffer(), f.name));
+      if (!a.ok) { window.avviso("Import da Excel", esc(a.errore)); return; }
+      if (!a.voci.length) { window.avviso("Import da Excel", "Ho trovato le intestazioni ma nessuna riga con un indirizzo o un inquilino."); return; }
+      anteprimaImport(a, f.name);
+    } catch (e) { window.avviso("Import da Excel", esc(e.message || String(e))); }
+  };
+  inp.click();
+}
+
+/* Mese da cui controllare gli affitti importati: quello in corso se la rata (il 5) non è ancora scaduta, altrimenti il prossimo. */
+function meseDiPartenza() {
+  const d = new Date();
+  if (d.getDate() > 5) d.setMonth(d.getMonth() + 1, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function anteprimaImport(a, nomeFile) {
+  const v = a.voci;
+  const nCase = new Set(v.map((x) => x.casa.nome.toLowerCase())).size;
+  const nInq = v.filter((x) => x.inquilino).length, nPol = v.filter((x) => x.polizza).length;
+  const nLav = v.filter((x) => x.casa.lavori).length;
+  const kpi = (t, n, nota = "") => `<div class="kpi glass"><div class="sub">${t}</div><div class="v">${n}</div>${nota ? `<div class="note">${nota}</div>` : ""}</div>`;
+  const scad = (k) => (k.scadenza ? dataIt(k.scadenza) : k.scadenza_testo ? `<span style="color:var(--warn)" title="Data non riconosciuta">${esc(k.scadenza_testo)} ?</span>` : `<span class="note">—</span>`);
+  apriModal(`${testaModal("Importa le case da Excel", esc(nomeFile))}
+    <div class="kpis imp-kpi">${kpi("Case", nCase, nLav ? `${nLav} con lavori` : "")}${kpi("Inquilini", nInq, `${nCase - new Set(v.filter((x) => x.inquilino).map((x) => x.casa.nome.toLowerCase())).size} sfitte`)}${kpi("Contratti", nInq)}${kpi("Polizze", nPol)}</div>
+    <details class="box imp-col"><summary><b>Colonne del file</b> <span class="note">${a.colonne.filter((c) => c.campo).length} riconosciute su ${a.colonne.length} · intestazioni alla riga ${a.riga_intestazioni}</span></summary>
+      ${a.colonne.map((c) => `<div class="row"><span>${esc(c.titolo)}</span><span class="${c.campo ? "" : "note"}" style="text-align:right">${c.campo ? "→ " + esc(c.nome_campo) : "non usata"}</span></div>`).join("")}
+    </details>
+    ${a.mancanti.length ? `<div class="note" style="color:var(--warn)">Non trovo le colonne: ${esc(a.mancanti.join(", "))}.</div>` : ""}
+    <div class="panel glass imp-anteprima"><table class="aff">
+      <thead><tr><th>Casa</th><th>Inquilino</th><th style="text-align:right">Affitto</th><th>Scadenza</th><th>Polizza</th></tr></thead>
+      <tbody>${v.map((x) => `<tr><td>${esc(x.casa.nome)}${x.casa.lavori ? ` <span title="Lavori in corso">🔧</span>` : ""}</td>
+        <td>${x.inquilino ? esc(x.inquilino.nome) : `<span class="stato giallo">sfitta</span>`}</td>
+        <td class="num">${x.contratto.canone ? euro(x.contratto.canone) : "—"}</td><td>${scad(x.contratto)}</td>
+        <td>${x.polizza ? esc(x.polizza.compagnia || x.polizza.numero || "sì") + (x.polizza.scadenza ? ` <span class="note">${dataIt(x.polizza.scadenza)}</span>` : "") : `<span class="note">—</span>`}</td></tr>`).join("")}</tbody></table></div>
+    <div class="box"><b>Come importare</b>
+      <div class="field"><label for="imp-mese">Controlla gli affitti a partire dal mese</label><input class="input" id="imp-mese" type="month" value="${meseDiPartenza()}" style="max-width:14rem">
+        <div class="note">I mesi prima non risultano da incassare. Da questo mese in poi registra i pagamenti, oppure importa l'estratto conto: i bonifici degli inquilini vengono riconosciuti.
+          Se vuoi controllare anche il mese in corso, sceglilo: gli affitti non ancora registrati risulteranno da incassare.</div></div>
+      <div class="field"><span class="sub">Il «costo amministrazione» del file…</span>
+        <label class="check"><input type="radio" name="imp-amm" value="inq" checked> lo paga l'inquilino insieme all'affitto (si somma al totale mensile)</label>
+        <label class="check"><input type="radio" name="imp-amm" value="prop"> è una spesa mia (spese condominio della casa)</label></div>
+      <div class="note">Le case già presenti con lo stesso indirizzo vengono aggiornate, non duplicate; lo stesso per inquilini con lo stesso nome e polizze con lo stesso numero.
+        Puoi quindi reimportare il file dopo averlo corretto. La data di inizio dei contratti è ricavata dalla scadenza e segnata come «stimata».</div>
+    </div>
+    <div class="actions"><button class="btn" type="button" id="m-annulla">Annulla</button><button class="btn primary" type="button" id="imp-ok">Importa ${v.length} ${v.length === 1 ? "riga" : "righe"}</button></div>`, true);
+  $("imp-ok").onclick = async () => {
+    $("imp-ok").disabled = true;
+    const amm = (document.querySelector('input[name="imp-amm"]:checked') || {}).value;
+    const r = await conErrore(() => api.importa_case(v, { incassi_dal: val("imp-mese"), amm_inquilino: amm !== "prop" }));
+    if (!r) { $("imp-ok").disabled = false; return; }
+    await aggiornaStato();
+    S.view = "immobili"; S.imm.dett = null; S.imm.filtro = "tutte";
+    render();
+    esitoImport(r);
+  };
+}
+
+function esitoImport(r) {
+  const riga = (t, n, agg = 0) => (n || agg ? `<div class="row"><span>${t}</span><span class="num">${n ? `${n} nuov${n === 1 ? "a" : "e"}` : ""}${n && agg ? " · " : ""}${agg ? `${agg} aggiornat${agg === 1 ? "a" : "e"}` : ""}</span></div>` : "");
+  apriModal(`${testaModal("Import completato")}
+    <div class="box">${riga("Case", r.case_nuove, r.case_agg)}${riga("Inquilini", r.inquilini, r.inquilini_agg)}${riga("Contratti", r.contratti, r.contratti_agg)}
+      ${riga("Polizze", r.polizze, r.polizze_agg)}${r.tipi ? `<div class="row"><span>Tipi di contratto creati</span><span class="num">${r.tipi}</span></div>` : ""}</div>
+    ${r.avvisi.length ? `<div class="box"><b>Da controllare</b>${r.avvisi.map((x) => `<div class="note" style="color:var(--text)">• ${esc(x)}</div>`).join("")}</div>` : ""}
+    <div class="note">Completa a mano quello che il file non dice: data di inizio vera, deposito, codice fiscale, tipo di polizza.
+      ${r.tipi ? "I tipi di contratto nuovi (★) hanno durata 12 mesi: correggili in Contratti → Tipi di contratto." : ""}</div>
+    <div class="actions"><button class="btn primary" type="button" id="m-annulla">Ok</button></div>`);
+}
